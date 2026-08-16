@@ -30,7 +30,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: All components
         id: all
@@ -83,7 +83,7 @@ jobs:
       # "Repository access" list or the step fails fetching them.
       - name: Generate release app token
         id: release-token
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           client-id: ${{ secrets.SEMANTIC_RELEASE_CLIENT_ID }}
           private-key: ${{ secrets.SEMANTIC_RELEASE_PRIVATE_KEY }}

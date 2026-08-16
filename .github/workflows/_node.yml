@@ -29,16 +29,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
       - name: Cache node_modules
         id: cache-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: node/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
@@ -57,15 +57,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
       - name: Restore node_modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
@@ -74,7 +74,7 @@ jobs:
       # Glob the config extension so the cache key stays accurate regardless of
       # which one the repo ends up using.
       - name: Cache ESLint results
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: node/.eslintcache
           key: eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/eslint.config.*') }}-${{ github.sha }}
@@ -107,15 +107,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
       - name: Restore node_modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
@@ -148,15 +148,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
       - name: Restore node_modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
@@ -201,15 +201,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
 
       - name: Restore node_modules
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: node/node_modules
           key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}

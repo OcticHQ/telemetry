@@ -24,6 +24,10 @@ document — delete a line when it is done, don't tick it.
       commit, so release-please does not walk history that predates it.
 - [ ] Enable **Discussions** (the issue-template config links to it) and
       **private security advisories** (`SECURITY.md` links to it).
+- [ ] Decide whether the **`npm` deployment environment** referenced by
+      `_publish-node.yml` should require manual approval. It is created
+      implicitly today and approves automatically, so the Release PR merge is
+      currently the only gate.
 
 ## Landing the SDK
 

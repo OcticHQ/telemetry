@@ -64,6 +64,20 @@ fi
 [ $# -ge 1 ] || usage
 base="$1"
 
+# An empty or bogus base is the dangerous input, not a missing one. `git log
+# ""..HEAD` lists nothing, so the script would report "0 commits checked, all
+# conventional" and exit 0 — a green gate that inspected nothing. That is
+# exactly what happens when the caller's `git merge-base` fails and its empty
+# output is passed straight through.
+[ -n "$base" ] || {
+  echo "::error::empty base — the caller's merge-base probably failed" >&2
+  exit 2
+}
+git rev-parse --verify --quiet "${base}^{commit}" >/dev/null || {
+  echo "::error::not a commit: ${base}" >&2
+  exit 2
+}
+
 status=0
 count=0
 

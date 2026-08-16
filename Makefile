@@ -58,6 +58,9 @@ node-pack: ## Build, then lint the tarball a consumer would receive
 
 # ── repo ─────────────────────────────────────────────────────────────────────
 
+# The merge-base fallback is for a clone with no `origin/main` yet — checking
+# every commit is the safe direction, and an empty base would make
+# check-commits.sh exit non-zero rather than pass silently.
 repo-check: ## Component registration + conventional commits since origin/main
 	./scripts/check-component-registration.sh
-	./scripts/check-commits.sh "$$(git merge-base origin/main HEAD)"
+	./scripts/check-commits.sh "$$(git merge-base origin/main HEAD 2>/dev/null || git rev-list --max-parents=0 HEAD)"
