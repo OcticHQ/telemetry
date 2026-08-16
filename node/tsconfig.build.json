@@ -1,0 +1,17 @@
+/*
+ * What ships. Source only, emitting to dist/.
+ *
+ * `rewriteRelativeImportExtensions` is what lets the source import `./foo.ts`
+ * — so `node --test` can run the tests directly with no build step — while the
+ * emitted JavaScript still imports `./foo.js`. Removing it breaks one of those
+ * two things, and which one is not obvious until a consumer reports it.
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"]
+}

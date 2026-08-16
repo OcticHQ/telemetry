@@ -1,0 +1,49 @@
+# The contract gate. Repo-wide, called by both pr.yml and ci.yml, and it runs
+# whether or not any component directory changed.
+#
+# This is the one check that crosses language boundaries. `attributes.yaml` is
+# the source of truth for every SDK and for be-ingest; edit it without
+# committing the regenerated constants for *every* language and this fails.
+# Nothing else in the repo would notice — the Node build is perfectly happy
+# compiling last week's constants, and the drift only surfaces as two SDKs
+# disagreeing about an attribute name in a customer's trace.
+#
+# It also catches the leak-shaped failure: a hand-written source restating a
+# key the contract owns, which is how `content.ts` ends up deciding something
+# is not content when the contract says it is.
+#
+# See handbook/adr/0003-attribute-contract-as-a-component.md.
+name: Contract
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Contract is current
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: contract/package-lock.json
+
+      - name: Install
+        working-directory: contract
+        run: npm ci
+
+      # --check never writes. A CI job that regenerated the artifacts would
+      # make the merged commit differ from the reviewed one, so the generator
+      # runs in a pre-commit hook and CI only verifies.
+      - name: Check
+        working-directory: contract
+        run: npm run check

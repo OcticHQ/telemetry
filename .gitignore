@@ -1,0 +1,12 @@
+node_modules/
+dist/
+*.tgz
+
+# Test and lint output
+junit.xml
+coverage/
+.eslintcache
+
+# Editors / OS
+.DS_Store
+*.swp

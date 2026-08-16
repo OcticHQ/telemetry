@@ -1,0 +1,32 @@
+/*
+ * The default project: source *and* tests, typecheck only.
+ *
+ * This is the one ESLint's project service finds, and the one `npm run
+ * typecheck` uses. Tests are `.ts` executed by node's type stripping, which
+ * checks nothing at runtime — without them in a project, a test could assert
+ * against a field that does not exist and stay green forever.
+ *
+ * What ships is a different question, and `tsconfig.build.json` answers it.
+ */
+{
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "noEmit": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src", "test"]
+}

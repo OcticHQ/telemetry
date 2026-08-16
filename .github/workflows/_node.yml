@@ -1,0 +1,235 @@
+# Checks for the Node SDK. Called by both pr.yml and ci.yml.
+#
+# Factored out rather than duplicated across the two, because the checks are
+# identical in both contexts and a copy would drift. The caller decides whether
+# to run it at all — see the `if:` on the calling job.
+#
+# Adding a language means adding `_python.yml` beside this file. It does not
+# mean editing this one, and it does not mean editing pr.yml or ci.yml beyond a
+# single `if:`.
+name: Node
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: node
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Phase 0 — install once, share the tree
+  # ─────────────────────────────────────────────
+  install:
+    name: Install
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Cache node_modules
+        id: cache-modules
+        uses: actions/cache@v4
+        with:
+          path: node/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
+
+      - name: Install dependencies (cache miss)
+        if: steps.cache-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+  # ─────────────────────────────────────────────
+  # Phase 1 — all in parallel
+  # ─────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04-arm
+    needs: install
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
+          fail-on-cache-miss: true
+
+      # Glob the config extension so the cache key stays accurate regardless of
+      # which one the repo ends up using.
+      - name: Cache ESLint results
+        uses: actions/cache@v4
+        with:
+          path: node/.eslintcache
+          key: eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/eslint.config.*') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/eslint.config.*') }}-
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format
+        run: npm run format:check
+
+      - name: Export lint results (JSON)
+        if: always()
+        run: npm run lint -- --format json --output-file lint-results.json || true
+
+      - name: Upload lint results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-lint-results
+          path: node/lint-results.json
+          if-no-files-found: ignore
+          retention-days: 1
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-24.04-arm
+    needs: install
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
+          fail-on-cache-miss: true
+
+      # The tests are `.ts` run through node's type stripping, which checks
+      # nothing. Without this job a test could assert against a field that does
+      # not exist and stay green until a consumer finds it.
+      - name: Typecheck
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck-output.txt
+
+      - name: Upload typecheck results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-typecheck-results
+          path: node/typecheck-output.txt
+          if-no-files-found: ignore
+          retention-days: 1
+
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-24.04-arm
+    needs: install
+    permissions:
+      contents: read
+      checks: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
+          fail-on-cache-miss: true
+
+      # `node --test` rather than a test framework: zero test dependencies in a
+      # package other people install. Its built-in junit reporter still feeds
+      # the same PR check the rest of the org uses.
+      - name: Run unit tests
+        run: npm run test:ci
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-test-results
+          path: node/junit.xml
+          if-no-files-found: ignore
+          retention-days: 1
+
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@v2
+        with:
+          name: Node Unit Tests
+          path: node/junit.xml
+          reporter: java-junit
+          fail-on-error: 'false'
+
+  # ─────────────────────────────────────────────
+  # Phase 2 — what actually gets published
+  # ─────────────────────────────────────────────
+  #
+  # The tarball is the artifact consumers receive, and almost nothing above
+  # inspects it. publint and attw read the built package the way npm, Node and
+  # bundlers will: wrong `exports`, missing types, a declaration that resolves
+  # to the wrong file. The PoC package would have failed several of these.
+  pack:
+    name: Pack
+    runs-on: ubuntu-24.04-arm
+    needs: [lint, typecheck, test]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node/node_modules
+          key: node-modules-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node/package-lock.json') }}
+          fail-on-cache-miss: true
+
+      - name: Lint the built package
+        run: npm run pack:check
+
+      - name: Dry-run publish
+        run: npm publish --dry-run
+
+      - name: Pack
+        run: npm pack --pack-destination .
+
+      # So a reviewer can download and open exactly what a publish would send,
+      # before the version is permanent.
+      - name: Upload tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: node-package-tarball
+          path: node/*.tgz
+          if-no-files-found: error
+          retention-days: 7

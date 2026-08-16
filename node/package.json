@@ -1,0 +1,76 @@
+{
+  "name": "@octic/telemetry",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Agent telemetry for Node. OTLP wiring, durable identity and agent annotations. Brings no instrumentation of its own.",
+  "keywords": [
+    "octic",
+    "opentelemetry",
+    "otel",
+    "telemetry",
+    "observability",
+    "llm",
+    "agents",
+    "genai"
+  ],
+  "homepage": "https://github.com/OcticHQ/octic-telemetry/tree/main/node#readme",
+  "bugs": {
+    "url": "https://github.com/OcticHQ/octic-telemetry/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OcticHQ/octic-telemetry.git",
+    "directory": "node"
+  },
+  "license": "Apache-2.0",
+  "author": "Octic.ai",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test 'test/*.test.ts'",
+    "test:ci": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=junit.xml 'test/*.test.ts'",
+    "lint": "eslint . --cache --cache-strategy content",
+    "lint:fix": "eslint . --cache --cache-strategy content --fix",
+    "format": "prettier --write . --ignore-path ../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../.prettierignore",
+    "pack:check": "npm run build && publint && attw --pack . --ignore-rules cjs-resolves-to-esm"
+  },
+  "peerDependencies": {
+    "@opentelemetry/api": "^1.9.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.2",
+    "@eslint/js": "^10.0.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@types/node": "^26.0.0",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.5.0",
+    "prettier": "^3.8.3",
+    "publint": "^0.3.16",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.59.0"
+  }
+}

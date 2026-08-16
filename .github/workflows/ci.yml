@@ -1,0 +1,109 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [main]
+
+# Not cancel-in-progress. A cancelled run between release-please cutting the
+# tag and the publish job running leaves a version tagged and unpublished —
+# recoverable, but only by someone who knows to look.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Phase 0 — every component, not just the changed ones
+  # ─────────────────────────────────────────────
+  #
+  # A release should be gated on the whole repo being valid, not on whatever
+  # the merge happened to touch. It is cheap, and it is the last gate before a
+  # version exists.
+  detect:
+    name: Enumerate components
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      components: ${{ steps.all.outputs.components }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: All components
+        id: all
+        run: |
+          components="$(./scripts/changed-components.sh)"
+          echo "components: $components"
+          echo "components=$components" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────
+  # Phase 1 — the same checks pr.yml runs
+  # ─────────────────────────────────────────────
+  contract:
+    name: Contract
+    uses: ./.github/workflows/_contract.yml
+
+  node:
+    name: Node
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'node')
+    uses: ./.github/workflows/_node.yml
+    permissions:
+      contents: read
+      checks: write
+
+  # ─────────────────────────────────────────────
+  # Phase 2 — the Release PR
+  # ─────────────────────────────────────────────
+  #
+  # Manifest mode: one Release PR per component, partitioned by the files a
+  # commit touched rather than by its scope. **Nothing is released by this job.**
+  # Merging the Release PR it opens is what cuts <component>/vX.Y.Z, and this
+  # same workflow then runs again on that merge — which is the run that reaches
+  # phase 3.
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    needs: [contract, node]
+    if: ${{ !cancelled() && needs.contract.result == 'success' && (needs.node.result == 'success' || needs.node.result == 'skipped') }}
+    outputs:
+      node-released: ${{ steps.release.outputs['node--release_created'] }}
+      node-tag: ${{ steps.release.outputs['node--tag_name'] }}
+
+    steps:
+      # The default GITHUB_TOKEN cannot push past a branch ruleset — it is not a
+      # valid bypass actor, and a workflow run it triggers does not start other
+      # workflows. This mints an installation token for the org-level
+      # "Semantic Release" GitHub App, which is on the bypass list.
+      #
+      # The secrets are org-level on OcticHQ; this repo must be in the secret's
+      # "Repository access" list or the step fails fetching them.
+      - name: Generate release app token
+        id: release-token
+        uses: actions/create-github-app-token@v2
+        with:
+          client-id: ${{ secrets.SEMANTIC_RELEASE_CLIENT_ID }}
+          private-key: ${{ secrets.SEMANTIC_RELEASE_PRIVATE_KEY }}
+
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ steps.release-token.outputs.token }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # ─────────────────────────────────────────────
+  # Phase 3 — publish, only on the run that cut a tag
+  # ─────────────────────────────────────────────
+  publish-node:
+    name: Publish Node
+    needs: release-please
+    if: needs.release-please.outputs.node-released == 'true'
+    uses: ./.github/workflows/_publish-node.yml
+    permissions:
+      contents: read
+      id-token: write

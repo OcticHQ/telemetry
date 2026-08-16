@@ -1,0 +1,684 @@
+# The Octic agent-telemetry attribute contract.
+#
+# This file is the source of truth. Nothing reads it at runtime — it is a
+# build-time input that generates per-language constants and the public
+# document. That is deliberate: the SDK will be ported to Python and Go, and a
+# TypeScript file cannot be the spec for a Python port.
+#
+#   attributes.yaml ──generate──┬─► generated/attributes.gen.ts   SDK + services
+#                               ├─► generated/attributes.py       (port, later)
+#                               └─► ATTRIBUTES.md                 public spec
+#
+# Three populations live here and they are frozen in three different senses.
+#
+#   stability: emitted   Attributes our SDK writes. Freezing these is an API
+#                        promise: a rename is a major version with dual-write,
+#                        because customer queries and our graph writes key off
+#                        them. This half is also the port spec.
+#
+#   stability: consumed  Attributes foreign instrumentation writes. We cannot
+#                        freeze what we do not own. What is frozen is the
+#                        *reader* — the canonical field name, the aliases we
+#                        accept, and the value normalisation. Upstream renaming
+#                        something is an additive alias, never a break.
+#
+#   stability: denied    Attributes we refuse to carry. Frozen here is the
+#                        policy, not the key list; the list grows as vendors
+#                        ship new detectors.
+#
+# Frozen does not mean immutable. It means additive-only and versioned: a
+# removal or a type change costs a `schema_version` bump.
+
+schema_version: 1
+
+# Reserved vs customer namespace.
+#
+# `octic.` is ours and nothing else may write into it. Before this split,
+# `withIdentity({ attributes: { stack: 'svc-otel' } })` produced `octic.stack`,
+# putting tenant-supplied keys in the same namespace as `octic.run.id` — and
+# because span-option attributes are applied at construction while the processor
+# stamps in `onStart`, a tenant key could overwrite ours. Customer attributes get
+# their own prefix so the collision is structurally impossible.
+#
+# Anything under `octic.custom.` is tenant-authored: it carries no contract, no
+# guaranteed type, and no promise of stability. A consumer may index it and show
+# it; nothing downstream may key a policy or a graph edge off it.
+#
+# Wire-visible consequence, already applied: `octic.stack` in the captured
+# samples is now `octic.custom.stack`. Done as a clean break rather than a
+# dual-write because nothing is published — that was true when the decision was
+# taken and will not be true again.
+namespaces:
+  reserved: 'octic.'
+  customer: 'octic.custom.'
+
+# Where content-classification lives. `content.keys` is not written here — it is
+# derived from every attribute carrying `class: content`, so the SDK's redaction
+# list and this document cannot disagree.
+content:
+  # A denylist alone fails open the day a vendor ships a key we have not seen.
+  # These catch the shape rather than the name.
+  patterns:
+    - '^gen_ai\.(prompt|completion)\.\d+\.'   # gen_ai.prompt.0.content, older Traceloop
+    - '(^|\.)(content|messages|instructions|arguments|result|definitions)$'
+  # Anything longer than this, authored by a scope we do not control, is treated
+  # as content regardless of its name.
+  heuristic_min_length: 200
+
+groups:
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: octic.resource
+    stability: emitted
+    level: resource
+    brief: >-
+      Identifies the SDK, the deployment and the agent. Normally resource
+      attributes. When a host SDK owns the tracer provider the resource is
+      theirs, so the span processor applies these per span instead — a consumer
+      MUST look in both places. Measured with OpenLLMetry, where the agent came
+      through empty until the per-span fallback existed.
+    fallback_level: span
+    attributes:
+      - id: octic.schema.version
+        type: string
+        requirement: required
+        class: metadata
+        owner: octic
+        brief: >-
+          Which version of this contract the payload was written against. The
+          escape hatch that makes every later change safe: without it a consumer
+          cannot tell a missing attribute from an older SDK.
+
+      - id: octic.sdk.name
+        type: string
+        requirement: required
+        class: metadata
+        owner: octic
+        examples: ['octic-node', 'octic-python']
+        brief: >-
+          Which of our SDKs produced this. `telemetry.sdk.*` is reserved for the
+          OpenTelemetry SDK itself and would be a lie here.
+
+      - id: octic.sdk.version
+        type: string
+        requirement: required
+        class: metadata
+        owner: octic
+        brief: Version of the Octic SDK.
+
+      - id: service.name
+        type: string
+        requirement: required
+        class: metadata
+        owner: semconv
+        semconv: ATTR_SERVICE_NAME
+        brief: Set by the OpenTelemetry SDK from `init()`. Listed so a port knows it is not optional.
+
+      - id: service.version
+        type: string
+        requirement: recommended
+        class: metadata
+        owner: semconv
+        semconv: ATTR_SERVICE_VERSION
+        brief: Version of the instrumented application.
+
+      - id: deployment.environment.name
+        type: string
+        requirement: recommended
+        class: environment
+        owner: semconv
+        semconv: ATTR_DEPLOYMENT_ENVIRONMENT_NAME
+        examples: ['production', 'staging']
+        brief: Which environment the run happened in.
+
+      - id: gen_ai.agent.id
+        type: string
+        requirement: required
+        class: identity
+        owner: semconv
+        semconv: ATTR_GEN_AI_AGENT_ID
+        brief: >-
+          The agent, as the application names it. Under the governance framing
+          the agent is the primary key, not the conversation.
+
+      - id: gen_ai.agent.name
+        type: string
+        requirement: recommended
+        class: identity
+        owner: semconv
+        semconv: ATTR_GEN_AI_AGENT_NAME
+        brief: Human-facing agent name.
+
+      - id: octic.agent.asset_ref
+        type: string
+        requirement: recommended
+        class: identity
+        owner: octic
+        examples: ['poc/agent/weather-assistant']
+        brief: >-
+          The graph join key — this agent as a node in the asset graph, so a
+          trace can be checked against the policies that apply to the thing that
+          produced it. Semconv has `gen_ai.agent.id`, but that is the agent's id
+          *to the provider*; it says nothing about what we discovered through an
+          integration.
+        note: >-
+          Required in practice for the Phase 2 graph write. Kept `recommended`
+          because a customer can emit useful telemetry without having mapped
+          their agents to assets yet.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: octic.run
+    stability: emitted
+    level: span
+    propagated: true
+    brief: >-
+      The run id, stamped on every span started inside the workflow scope —
+      including spans authored by instrumentation that has never heard of this
+      package. That propagation is the mechanism the whole PoC exists to prove.
+    attributes:
+      - id: octic.run.id
+        type: string
+        requirement: required
+        class: identity
+        owner: octic
+        propagated: true
+        examples: ['run-chat-turn-8d44e4']
+        brief: >-
+          Stable, human-facing id for one agent run. A trace id would technically
+          do, but it is opaque, not chosen by the application, and unusable as
+          something a person quotes in a ticket.
+        note: >-
+          Required on the `invoke_workflow` span and present on every descendant,
+          so ingest can attribute a span to its run without walking the tree.
+          Absent on unannotated traffic — consumers must degrade to trace-level
+          grouping rather than dropping the run.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: octic.identity
+    stability: emitted
+    level: span
+    propagated: true
+    brief: >-
+      Durable identity above a single run. A conversation spans many requests,
+      many processes, possibly many days, so it cannot be a span. Optional
+      throughout: every governance question is answerable without it.
+    attributes:
+      - id: gen_ai.conversation.id
+        type: string
+        requirement: opt_in
+        class: identity
+        owner: semconv
+        semconv: ATTR_GEN_AI_CONVERSATION_ID
+        propagated: true
+        brief: Groups many runs, across many requests, into one conversation.
+
+      - id: session.id
+        type: string
+        requirement: opt_in
+        class: identity
+        owner: semconv
+        semconv: ATTR_SESSION_ID
+        propagated: true
+        brief: >-
+          The same value as `gen_ai.conversation.id`, written twice on purpose.
+          One is the GenAI-specific name and one is the general name non-GenAI
+          tooling already understands; both are experimental, and which survives
+          is not ours to decide. Two attributes is cheaper than a migration.
+
+      - id: user.id
+        type: string
+        requirement: opt_in
+        class: identity
+        owner: semconv
+        semconv: ATTR_USER_ID
+        propagated: true
+        brief: The end user, as the tenant identifies them. Prefer a pseudonymous id.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: octic.prompt
+    stability: emitted
+    level: span
+    propagated: true
+    brief: Which prompt template produced a model call. The version is the audit question.
+    attributes:
+      - id: gen_ai.prompt.name
+        type: string
+        requirement: opt_in
+        class: metadata
+        owner: semconv
+        semconv: ATTR_GEN_AI_PROMPT_NAME
+        propagated: true
+        brief: Name of the prompt template.
+
+      - id: octic.prompt.version
+        type: string
+        requirement: opt_in
+        class: metadata
+        owner: octic
+        propagated: true
+        examples: ['v3']
+        brief: >-
+          Semconv names the prompt but not its version. "Which prompt version was
+          live when this went wrong" is the question an audit actually asks.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: octic.entity
+    stability: emitted
+    level: span
+    brief: >-
+      Spans our annotations create — the work no instrumentation can see.
+      Patching a provider SDK observes one HTTP call; it cannot know that five of
+      those calls were one agent doing one job.
+    attributes:
+      - id: gen_ai.operation.name
+        type: string
+        requirement: required
+        class: metadata
+        owner: semconv
+        semconv: ATTR_GEN_AI_OPERATION_NAME
+        enum:
+          - value: invoke_workflow
+            semconv: GEN_AI_OPERATION_NAME_VALUE_INVOKE_WORKFLOW
+            brief: The agent-run root span.
+          - value: execute_tool
+            semconv: GEN_AI_OPERATION_NAME_VALUE_EXECUTE_TOOL
+            brief: One tool execution.
+          - value: retrieval
+            semconv: GEN_AI_OPERATION_NAME_VALUE_RETRIEVAL
+            brief: A lookup that fetched context for the model.
+        brief: >-
+          Which annotation authored the span. All three values are real semconv
+          members, so our span kinds need no invented vocabulary.
+
+      - id: gen_ai.workflow.name
+        type: string
+        requirement: conditionally_required
+        condition: 'gen_ai.operation.name == invoke_workflow'
+        class: metadata
+        owner: semconv
+        semconv: ATTR_GEN_AI_WORKFLOW_NAME
+        brief: Name of the unit of agent work this span represents.
+        note: >-
+          Replaced `octic.entity.name`, which reinvented this for the workflow
+          span and duplicated `gen_ai.tool.name` and `gen_ai.data_source.id` on
+          the other two. Each span kind now uses its natural semconv key and
+          consumers read the `entity_name` derived field, which is the same
+          alias machinery the vendor attributes use — one concept, several keys.
+
+      - id: octic.entity.input
+        type: string
+        requirement: opt_in
+        class: content
+        owner: octic
+        emitted_on: [invoke_workflow, execute_tool, retrieval]
+        brief: >-
+          Serialized input of the annotated entity, JSON where serializable.
+          `gen_ai.input.messages` is deliberately not reused: that one means chat
+          messages specifically, and these carry arbitrary application values.
+        note: >-
+          Not produced at all under `capture: none` — our own content is the one
+          kind we can decline to create rather than create and then strip. On
+          `retrieval` this is the fallback: a string input goes to
+          `gen_ai.retrieval.query.text` instead, anything else lands here.
+
+      - id: octic.entity.output
+        type: string
+        requirement: opt_in
+        class: content
+        owner: octic
+        emitted_on: [invoke_workflow, execute_tool, retrieval]
+        brief: Serialized return value of the annotated entity.
+
+      - id: gen_ai.tool.name
+        type: string
+        requirement: conditionally_required
+        condition: 'gen_ai.operation.name == execute_tool'
+        class: metadata
+        owner: semconv
+        semconv: ATTR_GEN_AI_TOOL_NAME
+        brief: Name of the tool that was executed.
+
+      - id: gen_ai.tool.type
+        type: string
+        requirement: recommended
+        condition: 'gen_ai.operation.name == execute_tool'
+        class: metadata
+        owner: semconv
+        semconv: ATTR_GEN_AI_TOOL_TYPE
+        enum:
+          - value: function
+            brief: Application code the model chose to call. What `withTool()` wraps.
+          - value: extension
+            brief: A capability the provider executes on the model's behalf.
+          - value: datastore
+            brief: A store the model queries directly.
+        brief: >-
+          What kind of thing the *model* called. Distinct from
+          `octic.target.type`, which is what the tool then reached — the graph
+          question. Conflating the two is what made our spans say `service`
+          where the Vercel AI SDK says `function` for the same call.
+        note: >-
+          `withTool()` defaults to `function`, which is literally what it wraps
+          and what the AI SDK emits, so our stacks now agree. Semconv leaves the
+          enum open; these three are its documented values.
+
+      - id: gen_ai.data_source.id
+        type: string
+        requirement: conditionally_required
+        condition: 'gen_ai.operation.name == retrieval'
+        class: metadata
+        owner: semconv
+        semconv: ATTR_GEN_AI_DATA_SOURCE_ID
+        brief: Identifier of the data source that was queried.
+
+      - id: gen_ai.retrieval.query.text
+        type: string
+        requirement: opt_in
+        condition: 'gen_ai.operation.name == retrieval'
+        class: content
+        owner: semconv
+        semconv: ATTR_GEN_AI_RETRIEVAL_QUERY_TEXT
+        emitted_on: [retrieval]
+        brief: >-
+          The query that was issued, when the caller passed one as text. A
+          retrieval query genuinely is a string, so the semconv key is honest
+          here in a way it would not be for arbitrary tool arguments.
+        note: >-
+          Emitted ONLY when the input is a string. A caller passing a structure
+          gets `octic.entity.input` instead — the key promises text, and putting
+          a serialized object behind it is the same lie as the one below. The
+          matching `gen_ai.retrieval.documents` is deliberately not adopted at
+          all: `withRetrieval()` returns whatever the application returns, and
+          naming that `documents` would assert a shape nobody validates. The
+          result always stays on `octic.entity.output`.
+
+      - id: octic.target.name
+        type: string
+        requirement: recommended
+        class: metadata
+        owner: octic
+        brief: >-
+          What the span touched. `gen_ai.data_source.id` covers the retrieval
+          case only, so this is written uniformly across span kinds to give a
+          consumer one place to look.
+
+      - id: octic.target.type
+        type: string
+        requirement: recommended
+        class: metadata
+        owner: octic
+        enum:
+          - value: datastore
+          - value: service
+          - value: tool
+        brief: Kind of thing the span touched.
+
+      - id: octic.target.asset_ref
+        type: string
+        requirement: recommended
+        class: identity
+        owner: octic
+        examples: ['poc/datastore/city-guide', 'poc/service/forecast-api']
+        brief: >-
+          The graph join key for the target, which is what makes "this agent read
+          that datastore" a policy-checkable statement rather than a log line.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: octic.policy
+    stability: emitted
+    level: span
+    brief: What the content policy did to this span.
+    attributes:
+      - id: octic.redacted
+        type: boolean
+        requirement: conditionally_required
+        condition: 'content was withheld or replaced'
+        class: metadata
+        owner: octic
+        brief: >-
+          Content was withheld or replaced by policy. A consumer needs to tell
+          "this agent recorded nothing" apart from "this customer chose not to
+          send it" — without this they render the same.
+
+      - id: octic.content.capture
+        type: string
+        requirement: required
+        internal: true
+        class: metadata
+        owner: octic
+        enum:
+          - value: none
+            brief: Drop content. The product works fully at this setting.
+          - value: metadata
+            brief: Replace content with length plus a truncated SHA-256.
+          - value: full
+            brief: >-
+              Send content, after the tenant redactor and the length cap. The
+              default while this is early: content is opt-out for now, so a
+              first consumer sees everything the pipeline can carry.
+        brief: >-
+          The capture level in effect for this span, stamped by the processor so
+          it reaches foreign spans too, read at export, and REMOVED before the
+          span leaves the process.
+        note: >-
+          Internal plumbing, never on the wire. A consumer that sees this key has
+          a broken exporter upstream. Excluded from generated wire contracts.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: derived
+    stability: consumed
+    brief: >-
+      Facts foreign instrumentation records, which we read but do not own. Each
+      entry is a canonical field, the aliases accepted for it in priority order,
+      and any value normalisation. A consumer resolves a field through this table
+      instead of naming a vendor's key directly, so an upstream rename is an
+      added alias rather than a code change.
+    fields:
+      - id: entity_name
+        type: string
+        aliases: [gen_ai.workflow.name, gen_ai.tool.name, gen_ai.data_source.id]
+        brief: >-
+          What to call this span. The one field here that resolves attributes we
+          author ourselves rather than a vendor's: each span kind carries its
+          natural semconv key, and the alias table answers "what is this called"
+          without the consumer branching on `gen_ai.operation.name`. This is why
+          `octic.entity.name` no longer exists.
+
+      - id: provider
+        type: string
+        aliases: [gen_ai.provider.name, gen_ai.system]
+        emitted_by:
+          otel: gen_ai.system
+          openllmetry: gen_ai.provider.name
+          aisdk: gen_ai.provider.name
+        brief: Which model provider served the call.
+
+      - id: request_model
+        type: string
+        aliases: [gen_ai.request.model]
+        brief: Model the application asked for. Not the one that answered.
+
+      - id: response_model
+        type: string
+        aliases: [gen_ai.response.model]
+        brief: >-
+          Model that actually answered, pinned to a dated build. This plus token
+          counts is the only route to cost — no stack emits a price.
+
+      - id: response_id
+        type: string
+        aliases: [gen_ai.response.id]
+        brief: Provider-side id for the completion.
+
+      - id: finish_reason
+        type: string[]
+        aliases: [gen_ai.response.finish_reasons]
+        normalize:
+          tool_call: tool_calls
+          'tool-calls': tool_calls
+        emitted_by:
+          otel: tool_calls
+          openllmetry: tool_call
+          aisdk: tool-calls
+        brief: >-
+          Why generation stopped. Three stacks, three spellings of the same
+          value — the single clearest argument for normalising at read time.
+
+      - id: input_tokens
+        type: int
+        aliases: [gen_ai.usage.input_tokens]
+        brief: Prompt tokens billed.
+
+      - id: output_tokens
+        type: int
+        aliases: [gen_ai.usage.output_tokens]
+        brief: Completion tokens billed.
+
+      - id: total_tokens
+        type: int
+        aliases: [gen_ai.usage.total_tokens]
+        emitted_by:
+          openllmetry: gen_ai.usage.total_tokens
+        brief: >-
+          Traceloop only, and not a semconv key. Derive it from input plus output
+          rather than depending on it.
+
+      - id: cache_read_input_tokens
+        type: int
+        aliases: [gen_ai.usage.cache_read.input_tokens]
+        emitted_by:
+          aisdk: gen_ai.usage.cache_read.input_tokens
+        brief: Prompt tokens served from provider cache. AI SDK only.
+
+      - id: cache_creation_input_tokens
+        type: int
+        aliases: [gen_ai.usage.cache_creation.input_tokens]
+        emitted_by:
+          aisdk: gen_ai.usage.cache_creation.input_tokens
+        brief: Prompt tokens written to provider cache. AI SDK only.
+
+      - id: reasoning_output_tokens
+        type: int
+        aliases:
+          - gen_ai.usage.reasoning.output_tokens
+          - ai.usage.outputTokenDetails.reasoningTokens
+        emitted_by:
+          aisdk: ai.usage.outputTokenDetails.reasoningTokens
+        brief: >-
+          Reasoning tokens. Semconv has a name for this; the AI SDK emits its own
+          instead, so the semconv name leads and the vendor key is the fallback.
+
+      - id: tool_call_id
+        type: string
+        aliases: [gen_ai.tool.call.id]
+        brief: Provider-side id joining a tool call to its result.
+
+      - id: tool_call_arguments
+        type: string
+        class: content
+        aliases: [gen_ai.tool.call.arguments, ai.toolCall.args]
+        brief: Arguments the model chose for a tool call.
+
+      - id: tool_call_result
+        type: string
+        class: content
+        aliases: [gen_ai.tool.call.result, ai.toolCall.result]
+        brief: Value the tool returned to the model.
+
+      - id: input_messages
+        type: string
+        class: content
+        aliases: [gen_ai.input.messages, ai.prompt.messages, ai.prompt]
+        emitted_by:
+          openllmetry: gen_ai.input.messages
+          aisdk: gen_ai.input.messages
+        brief: >-
+          The conversation sent to the model. Traceloop and the AI SDK put this
+          on span attributes; @opentelemetry/instrumentation-openai puts it on
+          the logs signal instead, so a span-only consumer sees nothing there.
+
+      - id: output_messages
+        type: string
+        class: content
+        aliases: [gen_ai.output.messages, ai.response.text, ai.response.toolCalls]
+        brief: What the model returned.
+
+      - id: system_instructions
+        type: string
+        class: content
+        aliases: [gen_ai.system_instructions]
+        emitted_by:
+          aisdk: gen_ai.system_instructions
+        brief: The system prompt.
+
+      - id: tool_definitions
+        type: string
+        class: content
+        aliases: [gen_ai.tool.definitions]
+        brief: >-
+          Tool schemas offered to the model. Traceloop nests them under
+          `function`, the AI SDK flattens them — same information, two shapes.
+
+      - id: server_address
+        type: string
+        aliases: [server.address]
+        brief: Host the provider call went to.
+
+      - id: server_port
+        type: int
+        aliases: [server.port]
+        brief: Port the provider call went to. An int, not a string.
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: vendor.content
+    stability: consumed
+    class: content
+    brief: >-
+      Vendor-specific keys with no canonical field of their own, classified as
+      content so redaction covers them. Listed rather than pattern-matched
+      because the names give no hint of what they hold.
+    keys:
+      - ai.response.providerMetadata
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: exception.content
+    stability: consumed
+    class: content
+    brief: >-
+      Error text, which is content like any other. An exception message is
+      written by application code that was holding the prompt a moment earlier,
+      and a stack trace carries whatever the frames were called with — neither
+      is safe to treat as metadata just because it describes a failure.
+
+      These arrive as span *event* attributes rather than span attributes,
+      which is why they were invisible to redaction until the exporter learned
+      to walk events. Listed by name rather than left to the length heuristic
+      because that bound only applies to scopes we do not control, and
+      `withTool()` recording its own failure is our own scope.
+
+      `exception.type` is deliberately absent: a class name is a fact about the
+      code, not about the customer's data, and it is the one part of a failure
+      that stays legible at `capture: 'none'`.
+    keys:
+      - exception.message
+      - exception.stacktrace
+
+  # ──────────────────────────────────────────────────────────────────────────
+  - id: environment.denied
+    stability: denied
+    policy: deny
+    class: environment
+    brief: >-
+      Resource attributes nobody asked for. Traceloop's default detectors ship
+      the full argv, which is a well-known place for secrets in real deployments,
+      plus host and process identity we have no use for. Dropped at the SDK
+      exporter for a workflow-A customer and at ingest for a workflow-B customer,
+      from this one list.
+    keys:
+      - process.command_args
+      - process.command_line
+      - process.command
+      - process.owner
+      - process.executable.path
+      - host.id
+      - host.ip
+      - host.mac

@@ -1,0 +1,21 @@
+{
+  "name": "@octic/telemetry-contract-tools",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build-time toolchain for the attribute contract. Not published, and not the contract's version — that lives in version.txt.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "generate": "node generate.ts",
+    "check": "node generate.ts --check"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@types/node": "^26.0.0"
+  }
+}

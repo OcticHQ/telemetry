@@ -1,0 +1,45 @@
+version: 2
+
+updates:
+  # One ecosystem entry per component. A language added later adds an entry
+  # here; nothing else in this file changes.
+  - package-ecosystem: npm
+    directory: /node
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(node)'
+      # `chore` deliberately, not `fix`. A dependency bump in devDependencies
+      # ships nothing to a consumer, and typing it `fix` would cut a patch
+      # release for a linter upgrade.
+    groups:
+      dev-tooling:
+        patterns:
+          - '@eslint/*'
+          - 'eslint*'
+          - 'prettier'
+          - 'typescript*'
+          - '@types/*'
+          - 'publint'
+          - '@arethetypeswrong/*'
+      opentelemetry:
+        patterns:
+          - '@opentelemetry/*'
+
+  - package-ecosystem: npm
+    directory: /contract
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'chore(contract)'
+    # The semconv range here must track the one the Node SDK pins — the
+    # generator verifies every semconv constant against it. A lone bump on one
+    # side surfaces as a failed constant, which is the intended behaviour.
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: 'ci'

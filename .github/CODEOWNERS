@@ -1,0 +1,16 @@
+# Review ownership.
+#
+# TODO(setup): confirm the team slug before this repo goes public — an
+# unresolvable owner silently requests review from nobody, which reads exactly
+# like a repo with no required reviewers.
+
+* @OcticHQ/platform
+
+# The contract is the one file where a mistake reaches every SDK and both
+# backend services at once, and a rename is an API promise broken in public.
+/contract/ @OcticHQ/platform
+
+# Changing how versions are cut changes what a published tag means.
+/release-please-config.json @OcticHQ/platform
+/.release-please-manifest.json @OcticHQ/platform
+/.github/workflows/ @OcticHQ/platform

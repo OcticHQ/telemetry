@@ -1,0 +1,136 @@
+name: Pull Request Checks (PR)
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────
+  # Phase 0 — work out what to check
+  # ─────────────────────────────────────────────
+  detect:
+    name: Detect changed components
+    runs-on: ubuntu-24.04-arm
+    outputs:
+      components: ${{ steps.changed.outputs.components }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Need history back to the merge base to diff against it.
+          fetch-depth: 0
+
+      - name: Changed components
+        id: changed
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base="$(git merge-base FETCH_HEAD HEAD)"
+          components="$(./scripts/changed-components.sh "$base")"
+          echo "changed components: $components"
+          echo "components=$components" >> "$GITHUB_OUTPUT"
+
+  # ─────────────────────────────────────────────
+  # Phase 1 — checks, all in parallel
+  # ─────────────────────────────────────────────
+  #
+  # The contract gate is unconditional: it is the only check that spans
+  # languages, and it has to run even on a pull request that touched no
+  # component directory at all.
+  contract:
+    name: Contract
+    uses: ./.github/workflows/_contract.yml
+
+  # One `if:` per language. That is the entire cost of adding Python here.
+  node:
+    name: Node
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'node')
+    uses: ./.github/workflows/_node.yml
+    permissions:
+      contents: read
+      checks: write
+
+  repo:
+    name: Repository checks
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # release-please reads the commit *type* to decide the bump. A commit it
+      # cannot parse is skipped silently, so an unparseable `fix` ships nothing
+      # and warns nobody.
+      - name: Conventional commits
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          ./scripts/check-commits.sh "$(git merge-base FETCH_HEAD HEAD)"
+
+      # A component missing from either release-please file is never released,
+      # and nothing says so.
+      - name: Component registration
+        run: ./scripts/check-component-registration.sh
+
+  # ─────────────────────────────────────────────
+  # Phase 2 — reporting
+  # ─────────────────────────────────────────────
+  report:
+    name: Report
+    runs-on: ubuntu-24.04-arm
+    needs: [detect, contract, node, repo]
+    if: always()
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Build comment
+        env:
+          COMPONENTS: ${{ needs.detect.outputs.components }}
+          DETECT_RESULT: ${{ needs.detect.result }}
+          CONTRACT_RESULT: ${{ needs.contract.result }}
+          NODE_RESULT: ${{ needs.node.result }}
+          REPO_RESULT: ${{ needs.repo.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          icon() {
+            case "$1" in
+              success) printf '\xE2\x9C\x85' ;;
+              skipped) printf '\xE2\x9E\x96' ;;
+              *)       printf '\xE2\x9D\x8C' ;;
+            esac
+          }
+
+          components="$(echo "$COMPONENTS" | jq -r 'if length == 0 then "_none_" else map("`" + . + "`") | join(", ") end')"
+
+          {
+            echo "## CI \`${HEAD_SHA:0:7}\`"
+            echo
+            echo "Components checked: ${components}"
+            echo
+            echo "| | Check | Covers |"
+            echo "|:---:|:---|:---|"
+            echo "| $(icon "$DETECT_RESULT") | **Detect** | changed-component discovery |"
+            echo "| $(icon "$CONTRACT_RESULT") | **Contract** | generated constants current, no restated keys |"
+            echo "| $(icon "$NODE_RESULT") | **Node** | lint, format, typecheck, tests, pack |"
+            echo "| $(icon "$REPO_RESULT") | **Repository** | conventional commits, component registration |"
+            echo
+            echo "<sub>[Full run](${RUN_URL}) &middot; updated on every push</sub>"
+          } > pr-comment.md
+
+          cat pr-comment.md
+
+      - name: Post sticky PR comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: ci-report
+          path: pr-comment.md

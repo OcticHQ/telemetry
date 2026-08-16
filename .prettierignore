@@ -1,0 +1,15 @@
+# Markdown is hand-wrapped throughout this repo, and prose the formatter
+# rewraps is prose nobody can review as a diff. Every doc here is written to
+# ~80 columns by hand; keep it that way.
+*.md
+
+# Generated. Owned by contract/generate.ts and release-please respectively.
+node/src/attributes.gen.ts
+contract/ATTRIBUTES.md
+contract/version.txt
+
+# Build output and lockfiles.
+**/dist/
+**/node_modules/
+**/package-lock.json
+**/junit.xml

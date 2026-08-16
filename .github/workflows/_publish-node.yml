@@ -1,0 +1,81 @@
+# Publish @octic/telemetry to public npm.
+#
+# Called by ci.yml only, and only when release-please reports that it created a
+# release for the `node` component — that is, when the Release PR was merged
+# and `node/vX.Y.Z` now exists. Merging an ordinary pull request never reaches
+# here.
+#
+# That gate is the whole reason this repo uses release-please rather than the
+# org's usual semantic-release: an npm version is immutable and cannot be
+# unpublished after 72 hours, so there is one human review between a merged
+# commit and a permanent public artifact. See
+# handbook/adr/0002-per-sdk-versioning.md.
+name: Publish Node
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: npm publish
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      # Required for npm trusted publishing (OIDC). This is what replaces a
+      # long-lived NPM_TOKEN secret, and it is what mints the provenance
+      # attestation that shows on the package page.
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer. Node 24 ships something
+      # close enough that it usually works and occasionally does not, which is
+      # the worst kind of dependency.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      # The stub is `private: true` so that a pipeline exercised before the SDK
+      # arrives cannot publish an empty package. npm does not reliably refuse a
+      # private package on its own — `npm publish --dry-run` cheerfully accepts
+      # one — so the guard is here rather than assumed.
+      #
+      # Flipping `private` to false is part of the pull request that lands the
+      # real SDK, not a separate step someone has to remember.
+      - name: Guard on the private flag
+        id: guard
+        working-directory: node
+        run: |
+          private="$(jq -r '.private // false' package.json)"
+          if [ "$private" = "true" ]; then
+            echo '::notice::node/package.json is private — skipping publish. This is expected until the SDK lands.'
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: node
+        run: npm ci
+
+      # `prepack` builds, `publishConfig` sets public access and provenance.
+      # No NODE_AUTH_TOKEN: authentication is the OIDC token minted above.
+      # If trusted publishing is ever unavailable, the fallback is an
+      # `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` env on this step — at the
+      # cost of a long-lived credential and no provenance.
+      - name: Publish
+        if: steps.guard.outputs.skip != 'true'
+        working-directory: node
+        run: npm publish

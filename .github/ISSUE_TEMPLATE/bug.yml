@@ -1,0 +1,76 @@
+name: Bug report
+description: Something the SDK does that it should not, or does not do that it should.
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: the single most common failure is **no spans at all**,
+        and it is almost always initialisation order. Telemetry must finish
+        before the libraries it observes are imported — start the process with
+        `node --import ./telemetry.ts server.ts`, not a top-of-file import.
+
+        The second most common is **two copies of `@opentelemetry/api`** in the
+        dependency tree. `npm ls @opentelemetry/api` should print exactly one.
+
+  - type: dropdown
+    id: sdk
+    attributes:
+      label: SDK
+      options:
+        - Node (@octic/telemetry)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: SDK version
+      placeholder: '0.1.0'
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: Runtime version
+      placeholder: 'node -v'
+    validations:
+      required: true
+
+  - type: textarea
+    id: instrumentation
+    attributes:
+      label: Which instrumentation are you running?
+      description: >
+        This SDK ships none of its own, so what produced the spans matters.
+        Paste the relevant dependencies and versions.
+      placeholder: |
+        @opentelemetry/instrumentation-openai 0.19.0
+        openai 6.4.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Reproduction
+      description: The smallest program that shows it. A repository link is ideal.
+    validations:
+      required: true
+
+  - type: textarea
+    id: spans
+    attributes:
+      label: A span, if you have one
+      description: >
+        Redact anything sensitive. If content is involved, say which
+        `content.capture` level you are running.
+      render: json

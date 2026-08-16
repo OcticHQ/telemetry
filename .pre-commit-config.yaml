@@ -1,0 +1,81 @@
+# Local hooks so generated files stay generated without anyone remembering to
+# regenerate them.
+#
+#   pipx install pre-commit          # or: brew install pre-commit
+#   pre-commit install --install-hooks
+#   pre-commit install --hook-type commit-msg
+#
+# Both lines are needed — the second installs the commit-message check, which
+# `pre-commit install` alone does not.
+#
+# This is pre-commit rather than husky on purpose. A Node hook runner at the
+# repo root would mean a Python contributor's first command is `npm install`,
+# and the whole point of the layout is that it is not. See
+# handbook/adr/0005-no-root-package-manager.md.
+#
+# Kept fast. Anything slower than a couple of seconds belongs in CI, because a
+# hook that takes thirty seconds is a hook people learn to skip with
+# `--no-verify`.
+#
+# These hooks are a convenience, not a control. Every check that MUST hold is
+# enforced again in CI, where it cannot be bypassed — so `--no-verify` costs
+# you a red pull request, not a broken main.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+        # tsconfig files are JSONC — they carry the comments explaining why the
+        # build and typecheck projects are split, which is exactly the kind of
+        # thing that should not be deleted to satisfy a syntax checker.
+        exclude: ^node/tsconfig(\.build)?\.json$
+      - id: check-executables-have-shebangs
+
+  - repo: https://github.com/rbubley/mirrors-prettier
+    rev: v3.6.2
+    hooks:
+      - id: prettier
+        # Markdown is excluded repo-wide in .prettierignore: prose the
+        # formatter rewraps is prose nobody can review as a diff.
+        files: ^(node|contract)/.*\.(ts|js|mjs|json)$
+
+  - repo: local
+    hooks:
+      # Regenerates the per-language constants and the published spec. When it
+      # rewrites a file the commit stops so you can `git add` it — the
+      # generated artifacts land in the same commit as the change that caused
+      # them, which is what keeps CI's --check green.
+      #
+      # CI never regenerates, only verifies, so the merged commit is the
+      # reviewed commit.
+      - id: contract-generate
+        name: contract artifacts are current
+        entry: npm --prefix contract run --silent generate
+        language: system
+        pass_filenames: false
+        files: ^contract/(attributes\.yaml|generate\.ts)$
+
+      # A component missing from either release-please file is never released
+      # and nothing says so. Cheap to check, and much cheaper here than in
+      # review.
+      - id: component-registration
+        name: components are registered for release
+        entry: scripts/check-component-registration.sh
+        language: script
+        pass_filenames: false
+        files: ^(release-please-config\.json|\.release-please-manifest\.json|[^/]+/package\.json|[^/]+/version\.txt)$
+
+      # The same pattern CI enforces, applied before the commit exists rather
+      # than after the pull request is open.
+      - id: conventional-commit
+        name: conventional commit message
+        entry: scripts/check-commits.sh --message-file
+        language: script
+        stages: [commit-msg]
