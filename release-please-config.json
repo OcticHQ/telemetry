@@ -6,6 +6,7 @@
   "separate-pull-requests": true,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": false,
+  "bootstrap-sha": "7d0f851eab5402eb2c170aa896afba4d89e9a27a",
   "packages": {
     "node": {
       "release-type": "node",
