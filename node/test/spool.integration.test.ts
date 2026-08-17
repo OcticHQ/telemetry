@@ -170,7 +170,10 @@ describe('what a spooled file contains', () => {
         const onDisk = await segmentBytes(dir);
         assert.match(onDisk, /chat gpt-5/, 'the span did reach the spool');
         assert.ok(!onDisk.includes('4111'), 'but never with content on it');
-        assert.ok(!onDisk.includes('gen_ai.input.messages'), 'the key is gone too, not just the value');
+        assert.ok(
+          !onDisk.includes('gen_ai.input.messages'),
+          'the key is gone too, not just the value',
+        );
 
         await provider.shutdown();
       } finally {

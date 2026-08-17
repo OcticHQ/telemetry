@@ -20,7 +20,13 @@
 import { context, type Context } from '@opentelemetry/api';
 import type { LogRecordProcessor, SdkLogRecord } from '@opentelemetry/sdk-logs';
 import { ATTR_OCTIC_REDACTED } from './attributes.ts';
-import { applyCapture, applyCaptureToBody, contentScope, isContent, type ContentPolicy } from './content.ts';
+import {
+  applyCapture,
+  applyCaptureToBody,
+  contentScope,
+  isContent,
+  type ContentPolicy,
+} from './content.ts';
 
 export class RedactingLogRecordProcessor implements LogRecordProcessor {
   private readonly policy: ContentPolicy;
@@ -70,7 +76,7 @@ export class RedactingLogRecordProcessor implements LogRecordProcessor {
        * nothing in it. This diverges from the span path, which drops the key —
        * deliberately, and not worth papering over with a fake key elsewhere.
        */
-      record.setAttribute(key, kept === undefined ? '' : kept);
+      record.setAttribute(key, kept ?? '');
       redacted = true;
     }
 

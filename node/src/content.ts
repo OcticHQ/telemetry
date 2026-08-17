@@ -200,7 +200,15 @@ const textLength = (value: AttributeValue | undefined): number => {
 };
 
 const summarize = (value: unknown): string => {
-  const text = typeof value === 'string' ? value : JSON.stringify(value) ?? String(value);
+  const text =
+    typeof value === 'string'
+      ? value
+      : // Same lib.d.ts lie as annotations.ts: `JSON.stringify` is declared to
+        // return `string` and returns `undefined` for `undefined`, a function
+        // or a symbol. Dropping the `??` here would put "undefined" — or throw
+        // — into a redaction summary.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        (JSON.stringify(value) ?? String(value));
   return JSON.stringify({
     redacted: true,
     chars: text.length,

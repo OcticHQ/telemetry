@@ -21,6 +21,7 @@ import {
   truncate,
 } from '../src/content.ts';
 import { CONTENT_HEURISTIC_MIN_LENGTH } from '../src/attributes.ts';
+import { summaryOf } from './support/harness.ts';
 
 const policy = resolvePolicy();
 const closed = resolvePolicy({ capture: 'none' });
@@ -116,7 +117,10 @@ describe('isContent', () => {
    * never catches it, and a hand-written list once omitted it entirely.
    */
   it('covers a short declared key the heuristic cannot reach', () => {
-    assert.equal(isContent('gen_ai.tool.call.arguments', '{"location":"Paris"}', true, policy), true);
+    assert.equal(
+      isContent('gen_ai.tool.call.arguments', '{"location":"Paris"}', true, policy),
+      true,
+    );
   });
 });
 
@@ -134,7 +138,7 @@ describe('applyCapture', () => {
 
   it('summarizes any type under metadata', () => {
     for (const value of ['secret', 42, true, ['a', 'b']] as AttributeValue[]) {
-      const summary = JSON.parse(String(applyCapture(value, 'k', 'metadata', policy)));
+      const summary = summaryOf(applyCapture(value, 'k', 'metadata', policy));
       assert.equal(summary.redacted, true);
       assert.equal(typeof summary.chars, 'number');
       assert.match(summary.sha256, /^[0-9a-f]{16}$/);
@@ -265,7 +269,7 @@ describe('summaries', () => {
   });
 
   it('report the length of the original', () => {
-    const summary = JSON.parse(String(applyCapture('12345', 'k', 'metadata', policy)));
+    const summary = summaryOf(applyCapture('12345', 'k', 'metadata', policy));
     assert.equal(summary.chars, 5);
   });
 });

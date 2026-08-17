@@ -257,7 +257,10 @@ export class Spool {
      * cannot have their segments confused for each other.
      */
     const { createdAt: _createdAt, ...identity } = this.manifest;
-    this.manifestId = createHash('sha256').update(JSON.stringify(identity)).digest('hex').slice(0, 8);
+    this.manifestId = createHash('sha256')
+      .update(JSON.stringify(identity))
+      .digest('hex')
+      .slice(0, 8);
   }
 
   stats(): SpoolStats {
@@ -386,7 +389,11 @@ export class Spool {
         return;
       }
 
-      const batch = this.pending[0]!;
+      const batch = this.pending[0];
+      // Unreachable: the loop guard is `this.pending.length > 0`. Written as a
+      // narrowing rather than a `!` so `noUncheckedIndexedAccess` stays honest
+      // if the guard is ever changed.
+      if (batch === undefined) break;
       const admitted = await this.makeRoom(dir, batch.body.byteLength);
       if (!admitted) {
         this.pending.shift();
@@ -533,7 +540,9 @@ export class Spool {
   }
 
   /** Finished segments, oldest first. `.tmp` is somebody's in-flight write. */
-  private async listSegments(dir: string): Promise<{ path: string; size: number; mtimeMs: number }[]> {
+  private async listSegments(
+    dir: string,
+  ): Promise<{ path: string; size: number; mtimeMs: number }[]> {
     const names = await readdir(dir);
     const segments: { path: string; size: number; mtimeMs: number }[] = [];
 

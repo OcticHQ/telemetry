@@ -90,7 +90,9 @@ export class SpoolingSpanExporter implements SpanExporter {
       });
     } catch (error) {
       /** A transport that throws synchronously is a transport that failed. */
-      resultCallback(settle(this.toDisk(spans), { code: ExportResultCode.FAILED, error: error as Error }));
+      resultCallback(
+        settle(this.toDisk(spans), { code: ExportResultCode.FAILED, error: error as Error }),
+      );
     }
   }
 

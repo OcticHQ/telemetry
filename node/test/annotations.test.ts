@@ -20,6 +20,7 @@ import type { ContentOptions } from '../src/content.ts';
 import {
   buildProvider,
   installContextManager,
+  summaryOf,
   withGlobalTracerProvider,
   withPolicy,
 } from './support/harness.ts';
@@ -102,7 +103,10 @@ describe('tool type', () => {
     const collector = await emitting({ capture: 'none' }, () =>
       withTool({ name: 'search', toolType: 'extension' }, async () => undefined),
     );
-    assert.equal(attributesOf(collector.named('execute_tool search'))['gen_ai.tool.type'], 'extension');
+    assert.equal(
+      attributesOf(collector.named('execute_tool search'))['gen_ai.tool.type'],
+      'extension',
+    );
   });
 
   /**
@@ -155,7 +159,10 @@ describe('the target', () => {
     const collector = await emitting({ capture: 'none' }, () =>
       withTool({ name: 'lookup' }, async () => undefined),
     );
-    assert.equal(attributesOf(collector.named('execute_tool lookup'))['octic.target.name'], undefined);
+    assert.equal(
+      attributesOf(collector.named('execute_tool lookup'))['octic.target.name'],
+      undefined,
+    );
   });
 });
 
@@ -187,7 +194,9 @@ describe('input and output', () => {
     const collector = await emitting({ capture: 'metadata' }, () =>
       withTool({ name: 'get_weather', input: { city: 'Paris' } }, async () => ({ tempC: 14 })),
     );
-    const input = JSON.parse(String(attributesOf(collector.named('execute_tool get_weather'))['octic.entity.input']));
+    const input = summaryOf(
+      attributesOf(collector.named('execute_tool get_weather'))['octic.entity.input'],
+    );
     assert.equal(input.redacted, true);
     assert.match(input.sha256, /^[0-9a-f]{16}$/);
   });
@@ -196,7 +205,10 @@ describe('input and output', () => {
     const collector = await emitting({ capture: 'full' }, () =>
       withTool({ name: 'notify' }, async () => undefined),
     );
-    assert.equal(attributesOf(collector.named('execute_tool notify'))['octic.entity.output'], undefined);
+    assert.equal(
+      attributesOf(collector.named('execute_tool notify'))['octic.entity.output'],
+      undefined,
+    );
   });
 
   /** `null` is a result the tool actually produced, unlike `undefined`. */
@@ -204,14 +216,20 @@ describe('input and output', () => {
     const collector = await emitting({ capture: 'full' }, () =>
       withTool({ name: 'lookup' }, async () => null),
     );
-    assert.equal(attributesOf(collector.named('execute_tool lookup'))['octic.entity.output'], 'null');
+    assert.equal(
+      attributesOf(collector.named('execute_tool lookup'))['octic.entity.output'],
+      'null',
+    );
   });
 
   it('records a string input as itself, not as JSON', async () => {
     const collector = await emitting({ capture: 'full' }, () =>
       withTool({ name: 'echo', input: 'plain text' }, async () => undefined),
     );
-    assert.equal(attributesOf(collector.named('execute_tool echo'))['octic.entity.input'], 'plain text');
+    assert.equal(
+      attributesOf(collector.named('execute_tool echo'))['octic.entity.input'],
+      'plain text',
+    );
   });
 });
 
@@ -348,7 +366,10 @@ describe('when the wrapped work throws', () => {
     const collector = await emitting({ capture: 'full' }, async () => {
       await assert.rejects(() => withTool({ name: 'failing' }, async () => Promise.reject(boom)));
     });
-    assert.equal(attributesOf(collector.named('execute_tool failing'))['octic.entity.output'], undefined);
+    assert.equal(
+      attributesOf(collector.named('execute_tool failing'))['octic.entity.output'],
+      undefined,
+    );
   });
 
   it('unwinds the run scope so a later span is not attributed to the failed run', async () => {

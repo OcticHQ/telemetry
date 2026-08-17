@@ -92,10 +92,17 @@ export class IdentitySpanProcessor implements SpanProcessor {
     span.setAttribute(ATTR_OCTIC_CONTENT_CAPTURE, override ?? activePolicy().capture);
   }
 
-  /** Enrichment only — export is somebody else's processor. */
+  /**
+   * Enrichment only — export is somebody else's processor. `SpanProcessor`
+   * requires all three, and this one owns no queue, no transport and no timer,
+   * so there is genuinely nothing for them to do. Empty on purpose, not
+   * unfinished.
+   */
+  /* eslint-disable @typescript-eslint/no-empty-function */
   onEnd(): void {}
 
   async shutdown(): Promise<void> {}
 
   async forceFlush(): Promise<void> {}
+  /* eslint-enable @typescript-eslint/no-empty-function */
 }

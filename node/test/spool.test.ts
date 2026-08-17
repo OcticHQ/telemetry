@@ -269,7 +269,10 @@ describe('the bounds', () => {
       await spool.forceFlush();
 
       assert.equal(spool.directory, undefined);
-      assert.ok(spool.stats().dropped >= 500 - 128, 'nothing is held once there is nowhere to put it');
+      assert.ok(
+        spool.stats().dropped >= 500 - 128,
+        'nothing is held once there is nowhere to put it',
+      );
       await spool.shutdown();
     });
   });

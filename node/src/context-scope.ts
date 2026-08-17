@@ -50,7 +50,10 @@ export const createContextScope = <T>({
 
   const contextWith = (ctx: Context, value: T): Context => {
     const existing = from(ctx);
-    return ctx.setValue(contextKey, existing !== undefined && merge ? merge(existing, value) : value);
+    return ctx.setValue(
+      contextKey,
+      existing !== undefined && merge ? merge(existing, value) : value,
+    );
   };
 
   return {

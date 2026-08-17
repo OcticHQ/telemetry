@@ -46,10 +46,13 @@ describe('fifty runs at once', () => {
             withIdentity({ conversationId: `conv-${index}`, userId: `user-${index}` }, () =>
               withWorkflow({ name: 'chat-turn', runId: `run-${index}` }, async () => {
                 await jitter();
-                await withPrompt({ template: `template-${index}`, version: String(index) }, async () => {
-                  await jitter();
-                  foreignTracer.startSpan(`chat-${index}`).end();
-                });
+                await withPrompt(
+                  { template: `template-${index}`, version: String(index) },
+                  async () => {
+                    await jitter();
+                    foreignTracer.startSpan(`chat-${index}`).end();
+                  },
+                );
                 await withTool({ name: `tool-${index}` }, async () => {
                   await jitter();
                 });

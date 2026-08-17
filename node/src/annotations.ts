@@ -90,6 +90,10 @@ const captureContent = (value: unknown): string | undefined =>
 const serialize = (value: unknown): string => {
   try {
     const text = typeof value === 'string' ? value : JSON.stringify(value);
+    // lib.d.ts types `JSON.stringify` as returning `string`. It returns
+    // `undefined` for `undefined`, a function or a symbol, so the check is load
+    // -bearing and the rule is reading a declaration that is wrong.
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (text === undefined) return String(value);
     return truncate(text, MAX_SERIALIZED, '…[truncated]');
   } catch {
@@ -150,6 +154,10 @@ const runEntity = <T>(
     async span => {
       try {
         const result = await fn();
+        // `T` is unconstrained, so the checker sees no overlap with `undefined`
+        // — but the common call is `withTool(opts, async () => { … })` with no
+        // return, where `T` is `void` and `result` is `undefined` at runtime.
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         const output = result === undefined ? undefined : captureContent(result);
         if (output !== undefined) {
           span.setAttribute(ATTR_OCTIC_ENTITY_OUTPUT, output);

@@ -25,6 +25,7 @@ import { RedactingLogRecordProcessor } from '../src/redacting-log-processor.ts';
 import { resolvePolicy, withContent, type ContentOptions } from '../src/content.ts';
 import { withIdentity } from '../src/identity.ts';
 import { runScope } from '../src/run.ts';
+import { summaryOf } from './support/harness.ts';
 
 /**
  * Without this every `context.with` is a no-op: the API's default context
@@ -39,8 +40,10 @@ const FOREIGN_SCOPE = '@vendor/instrumentation-openai';
 
 /** Copied from receiver/captured/ — the keys three real stacks actually send. */
 const CONTENT = {
-  'gen_ai.input.messages': '[{"role":"user","parts":[{"type":"text","content":"my card is 4111 1111 1111 1111"}]}]',
-  'gen_ai.output.messages': '[{"role":"assistant","parts":[{"type":"text","content":"It is 14C in Paris."}]}]',
+  'gen_ai.input.messages':
+    '[{"role":"user","parts":[{"type":"text","content":"my card is 4111 1111 1111 1111"}]}]',
+  'gen_ai.output.messages':
+    '[{"role":"assistant","parts":[{"type":"text","content":"It is 14C in Paris."}]}]',
   'gen_ai.system_instructions': 'You are a concise weather assistant.',
   'gen_ai.tool.call.result': '{"tempC":14}',
 };
@@ -156,7 +159,7 @@ describe('capture: none', () => {
 describe('capture: metadata', () => {
   it('replaces content with length and hash', () => {
     const span = emit({ capture: 'metadata' });
-    const summary = JSON.parse(String(span.attributes['gen_ai.input.messages']));
+    const summary = summaryOf(span.attributes['gen_ai.input.messages']);
     assert.equal(summary.redacted, true);
     assert.equal(summary.chars, CONTENT['gen_ai.input.messages'].length);
     assert.match(summary.sha256, /^[0-9a-f]{16}$/);
@@ -164,8 +167,8 @@ describe('capture: metadata', () => {
   });
 
   it('hashes equal content equally, so "same prompt as last run" is answerable', () => {
-    const a = JSON.parse(String(emit({ capture: 'metadata' }).attributes['gen_ai.system_instructions']));
-    const b = JSON.parse(String(emit({ capture: 'metadata' }).attributes['gen_ai.system_instructions']));
+    const a = summaryOf(emit({ capture: 'metadata' }).attributes['gen_ai.system_instructions']);
+    const b = summaryOf(emit({ capture: 'metadata' }).attributes['gen_ai.system_instructions']);
     assert.equal(a.sha256, b.sha256);
   });
 });
@@ -191,7 +194,9 @@ describe('capture: full', () => {
     const span = tracer.startSpan('chat gpt-5');
     span.setAttribute('gen_ai.input.messages', 'y'.repeat(500));
     span.end();
-    assert.ok(String(collector.spans[0]!.attributes['gen_ai.input.messages']).endsWith('…[truncated]'));
+    assert.ok(
+      String(collector.spans[0]!.attributes['gen_ai.input.messages']).endsWith('…[truncated]'),
+    );
   });
 
   it('fails closed when the redactor throws', () => {
@@ -320,15 +325,20 @@ describe('our own entity input and output', () => {
     const collector = new Collector();
     const provider = new NodeTracerProvider({
       spanProcessors: [
-        new SimpleSpanProcessor(new RedactingSpanExporter(collector, resolvePolicy({ capture: 'none' }))),
+        new SimpleSpanProcessor(
+          new RedactingSpanExporter(collector, resolvePolicy({ capture: 'none' })),
+        ),
       ],
     });
     const restore = trace.getTracerProvider();
     trace.setGlobalTracerProvider(provider);
     try {
-      await withWorkflow({ name: 'chat-turn', input: { message: 'secret question' } }, async () => ({
-        reply: 'secret answer',
-      }));
+      await withWorkflow(
+        { name: 'chat-turn', input: { message: 'secret question' } },
+        async () => ({
+          reply: 'secret answer',
+        }),
+      );
     } finally {
       trace.disable();
       trace.setGlobalTracerProvider(restore);
@@ -384,7 +394,9 @@ describe('span events', () => {
   });
 
   it('summarizes the message under metadata', () => {
-    const summary = JSON.parse(String(withException({ capture: 'metadata' }).attributes?.['exception.message']));
+    const summary = summaryOf(
+      withException({ capture: 'metadata' }).attributes?.['exception.message'],
+    );
     assert.equal(summary.redacted, true);
     assert.match(summary.sha256, /^[0-9a-f]{16}$/);
   });
@@ -419,7 +431,9 @@ describe('span events', () => {
   it('redacts content on a foreign event too, not just exceptions', () => {
     const { collector, tracer } = harness({ capture: 'none' });
     const span = tracer.startSpan('chat gpt-5');
-    span.addEvent('gen_ai.user.message', { 'gen_ai.input.messages': CONTENT['gen_ai.input.messages'] });
+    span.addEvent('gen_ai.user.message', {
+      'gen_ai.input.messages': CONTENT['gen_ai.input.messages'],
+    });
     span.end();
     const event = collector.spans[0]!.events.find(entry => entry.name === 'gen_ai.user.message')!;
     assert.equal(event.attributes?.['gen_ai.input.messages'], undefined);
@@ -450,13 +464,16 @@ describe('the status message', () => {
   });
 
   it('is summarized under metadata', () => {
-    const summary = JSON.parse(String(withStatus({ capture: 'metadata' }).status.message));
+    const summary = summaryOf(withStatus({ capture: 'metadata' }).status.message);
     assert.equal(summary.redacted, true);
     assert.ok(!JSON.stringify(summary).includes('4111'));
   });
 
   it('passes through under full with no redactor', () => {
-    assert.equal(withStatus({ capture: 'full' }).status.message, 'card 4111 1111 1111 1111 declined');
+    assert.equal(
+      withStatus({ capture: 'full' }).status.message,
+      'card 4111 1111 1111 1111 declined',
+    );
   });
 
   it('is left alone when there is no message at all', () => {
@@ -494,7 +511,7 @@ describe('array attributes', () => {
 
   it('summarizes it under metadata without revealing an element', () => {
     const summary = String(emitArray({ capture: 'metadata' }).attributes['gen_ai.input.messages']);
-    assert.equal(JSON.parse(summary).redacted, true);
+    assert.equal(summaryOf(summary).redacted, true);
     assert.ok(!summary.includes('4111'));
   });
 
@@ -507,7 +524,11 @@ describe('array attributes', () => {
     assert.equal(kept.length, 2, 'both elements survive');
     assert.ok(!kept[0]!.includes('4111'));
     assert.ok(kept[0]!.includes('[card]'));
-    assert.equal(kept[1], 'and my pin is 0000', 'an element the redactor did not match is unchanged');
+    assert.equal(
+      kept[1],
+      'and my pin is 0000',
+      'an element the redactor did not match is unchanged',
+    );
   });
 
   it('applies maxLength to each element', () => {
@@ -587,7 +608,9 @@ describe('the capture level is not a span attribute', () => {
 
   it('never ships the key itself, whoever wrote it', () => {
     const { collector, tracer } = harness({ capture: 'none' });
-    const span = tracer.startSpan('chat gpt-5', { attributes: { 'octic.content.capture': 'full' } });
+    const span = tracer.startSpan('chat gpt-5', {
+      attributes: { 'octic.content.capture': 'full' },
+    });
     span.end();
     assert.equal(collector.spans[0]!.attributes['octic.content.capture'], undefined);
   });

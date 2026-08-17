@@ -81,10 +81,7 @@ describe('nesting merges rather than replaces', () => {
   it('lets an inner call correct the user id', () => {
     withIdentity({ userId: 'anonymous' }, () => {
       withIdentity({ userId: 'user-42' }, () => {
-        assert.equal(
-          (identityScope.attributesFrom(context.active()) ?? {})['user.id'],
-          'user-42',
-        );
+        assert.equal(identityScope.attributesFrom(context.active())?.['user.id'], 'user-42');
       });
     });
   });

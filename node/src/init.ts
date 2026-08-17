@@ -17,10 +17,7 @@ import { resourceFromAttributes } from '@opentelemetry/resources';
 import { LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
 import { SimpleSpanProcessor, type SpanExporter } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-} from '@opentelemetry/semantic-conventions';
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { agentAttributes, type Agent } from './agent.ts';
 import {
   ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
@@ -34,7 +31,13 @@ import { IdentitySpanProcessor } from './processor.ts';
 import { RedactingLogRecordProcessor } from './redacting-log-processor.ts';
 import { RedactingSpanExporter } from './redacting-exporter.ts';
 import { SpoolingLogRecordExporter, SpoolingSpanExporter } from './spool-exporter.ts';
-import { resolveSpoolOptions, Spool, type SpoolMode, type SpoolOptions, type SpoolStats } from './spool.ts';
+import {
+  resolveSpoolOptions,
+  Spool,
+  type SpoolMode,
+  type SpoolOptions,
+  type SpoolStats,
+} from './spool.ts';
 
 const SDK_NAME = 'octic-node';
 const SDK_VERSION = '0.0.0';
@@ -164,6 +167,13 @@ const setup = (
    * A library bundling its own nested copy of import-in-the-middle is not
    * served by this registration and needs its own escape hatch.
    */
+  // DEP0205. The replacement is `module.registerHooks` via
+  // `import-in-the-middle/register-hooks.mjs`, gated on `supportsSyncHooks()`
+  // with this as the fallback. Deliberately not changed here: this pull request
+  // moves code and changes no behaviour, and swapping the loader hook changes
+  // when and how foreign modules are patched. It lands with the rest of the
+  // public-surface work.
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   register('@opentelemetry/instrumentation/hook.mjs', import.meta.url);
 
   const provenance = {
@@ -211,7 +221,8 @@ const setup = (
   const spoolMode: SpoolMode = credentialed ? spoolConfig.mode : 'only';
   const transport = spoolConfig.enabled ? spoolMode !== 'only' : true;
 
-  const headers = auth === 'none' || apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
+  const headers =
+    auth === 'none' || apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
   const base = endpoint.replace(/\/$/, '');
 
   /**
@@ -225,17 +236,20 @@ const setup = (
 
   const signalPaths = { traces: '/v1/traces', logs: '/v1/logs' } as const;
   const spoolInstance = spoolConfig.enabled
-    ? new Spool({ ...spoolConfig, mode: spoolMode }, {
-        endpoint: base,
-        signalPaths,
-        contentType: 'application/json',
-        contentEncoding: 'identity',
-        serviceName,
-        octicSchemaVersion: OCTIC_SCHEMA_VERSION,
-        sdkName: SDK_NAME,
-        sdkVersion: SDK_VERSION,
-        contentCapture: contentPolicy.capture,
-      })
+    ? new Spool(
+        { ...spoolConfig, mode: spoolMode },
+        {
+          endpoint: base,
+          signalPaths,
+          contentType: 'application/json',
+          contentEncoding: 'identity',
+          serviceName,
+          octicSchemaVersion: OCTIC_SCHEMA_VERSION,
+          sdkName: SDK_NAME,
+          sdkVersion: SDK_VERSION,
+          contentCapture: contentPolicy.capture,
+        },
+      )
     : undefined;
 
   /**
@@ -244,14 +258,20 @@ const setup = (
    * redacting-exporter.ts — and so the spool inside it can only ever see spans
    * the content policy has already been applied to.
    */
-  /** The transport is only ever absent when the spool is there to replace it,
-   *  which is what the two `!` below assert. */
+  /**
+   * The transport is only ever absent when the spool is there to replace it,
+   * which is what the two `!` below assert. The invariant is real but lives in
+   * `resolveTransport`, so the checker cannot see it from here, and expressing
+   * it properly means either restructuring this branch or throwing when both
+   * are missing — a behaviour change, so not in this pull request.
+   */
   const traceTransport = transport
     ? new OTLPTraceExporter({ url: `${base}${signalPaths.traces}`, headers })
     : undefined;
   const traceExporter = new RedactingSpanExporter(
     spoolInstance === undefined
-      ? traceTransport!
+      ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
+        traceTransport!
       : new SpoolingSpanExporter({
           ...(traceTransport === undefined ? {} : { inner: traceTransport }),
           spool: spoolInstance,
@@ -264,7 +284,8 @@ const setup = (
     : undefined;
   const logExporter =
     spoolInstance === undefined
-      ? logTransport!
+      ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
+        logTransport!
       : new SpoolingLogRecordExporter({
           ...(logTransport === undefined ? {} : { inner: logTransport }),
           spool: spoolInstance,
@@ -289,7 +310,14 @@ const setup = (
   });
   logs.setGlobalLoggerProvider(loggerProvider);
 
-  return { resource, identityProcessor, traceExporter, loggerProvider, contentPolicy, spool: spoolInstance };
+  return {
+    resource,
+    identityProcessor,
+    traceExporter,
+    loggerProvider,
+    contentPolicy,
+    spool: spoolInstance,
+  };
 };
 
 /** The public view of the spool, so nothing outside this package holds the object itself. */
@@ -334,9 +362,12 @@ export const init = (options: InitOptions): Telemetry => {
  * SDK that owns the provider, no span reaches the endpoint.
  */
 export const initWithExternalProvider = (options: InitOptions): ExternalProviderTelemetry => {
-  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool } = setup(options, {
-    provenanceOnSpans: true,
-  });
+  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool } = setup(
+    options,
+    {
+      provenanceOnSpans: true,
+    },
+  );
 
   const handle = spoolHandle(spool);
   return {

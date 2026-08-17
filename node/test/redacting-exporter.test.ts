@@ -116,8 +116,12 @@ describe('resource scrubbing', () => {
     const exporter = new RedactingSpanExporter(collector, resolvePolicy({ capture: 'none' }));
 
     await exportOnce(exporter, [
-      fakeReadableSpan({ resource: resourceFromAttributes({ 'service.name': 'a', 'host.id': 'x' }) }),
-      fakeReadableSpan({ resource: resourceFromAttributes({ 'service.name': 'b', 'host.id': 'y' }) }),
+      fakeReadableSpan({
+        resource: resourceFromAttributes({ 'service.name': 'a', 'host.id': 'x' }),
+      }),
+      fakeReadableSpan({
+        resource: resourceFromAttributes({ 'service.name': 'b', 'host.id': 'y' }),
+      }),
     ]);
 
     assert.equal(collector.spans[0]!.resource.attributes['service.name'], 'a');
@@ -167,7 +171,11 @@ describe('the copied span', () => {
 
     await exportOnce(exporter, [original]);
 
-    assert.equal(original.attributes['gen_ai.input.messages'], 'secret', 'the original is untouched');
+    assert.equal(
+      original.attributes['gen_ai.input.messages'],
+      'secret',
+      'the original is untouched',
+    );
     assert.equal(original.status.message, 'boom');
     assert.equal(collector.only().attributes['gen_ai.input.messages'], undefined);
   });

@@ -11,7 +11,11 @@
  * the other case — an orchestrator process hosting several — where it overrides
  * the resource value per run.
  */
-import { ATTR_GEN_AI_AGENT_ID, ATTR_GEN_AI_AGENT_NAME, ATTR_OCTIC_AGENT_ASSET_REF } from './attributes.ts';
+import {
+  ATTR_GEN_AI_AGENT_ID,
+  ATTR_GEN_AI_AGENT_NAME,
+  ATTR_OCTIC_AGENT_ASSET_REF,
+} from './attributes.ts';
 import { createContextScope } from './context-scope.ts';
 
 export interface Agent {

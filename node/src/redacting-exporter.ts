@@ -99,7 +99,13 @@ export class RedactingSpanExporter implements SpanExporter {
       this.inner.export(this.sanitizeAll(spans), resultCallback);
       return;
     }
-    void Promise.all(pending.map(span => span.resource.waitForAsyncAttributes?.())).then(() => {
+    void Promise.all(
+      // `?? Promise.resolve()` rather than passing `undefined` into the
+      // aggregator: `asyncAttributesPending` being true implies the method
+      // exists, but the type does not say so, and `Promise.all` over a
+      // possibly-undefined element hides that from the reader.
+      pending.map(span => span.resource.waitForAsyncAttributes?.() ?? Promise.resolve()),
+    ).then(() => {
       this.inner.export(this.sanitizeAll(spans), resultCallback);
     });
   }
@@ -186,7 +192,12 @@ export class RedactingSpanExporter implements SpanExporter {
       span.status.message === undefined
         ? span.status
         : (() => {
-            const kept = applyCapture(span.status.message, STATUS_MESSAGE_KEY, capture, this.policy);
+            const kept = applyCapture(
+              span.status.message,
+              STATUS_MESSAGE_KEY,
+              capture,
+              this.policy,
+            );
             if (kept === span.status.message) return span.status;
             redacted = true;
             return kept === undefined

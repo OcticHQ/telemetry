@@ -32,7 +32,7 @@ export interface Identity {
    * Tenant-side business identifiers. Stamped under `octic.custom.`, not
    * `octic.` — see the note on the mapping below.
    */
-  attributes?: Record<string, string | number | boolean>
+  attributes?: Record<string, string | number | boolean>;
 }
 
 export const identityScope = createContextScope<Identity>({

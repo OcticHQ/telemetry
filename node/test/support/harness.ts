@@ -57,6 +57,25 @@ export const CONTENT = {
   'gen_ai.tool.call.result': '{"tempC":14}',
 } as const;
 
+/**
+ * The shape `content.ts`'s `summarize()` writes when capture is `metadata`.
+ *
+ * Declared here rather than re-derived at each assertion because `JSON.parse`
+ * returns `any`, and an `any` in a test is worse than an `any` in the source:
+ * `summary.sha526` would type-check, run, and pass by being `undefined ===
+ * undefined`. Parsing through a declared shape is what makes a typo in an
+ * assertion a compile error.
+ */
+export interface RedactionSummary {
+  redacted: true;
+  chars: number;
+  sha256: string;
+}
+
+/** Parse a `metadata`-capture summary off an attribute value. */
+export const summaryOf = (value: unknown): RedactionSummary =>
+  JSON.parse(String(value)) as RedactionSummary;
+
 /** Not content, and must survive every setting — this is the product. */
 export const GOVERNANCE = {
   'gen_ai.conversation.id': 'conv-1',
@@ -335,10 +354,12 @@ export const fakeCollector = async () => {
       if (hang) return;
 
       const raw = Buffer.concat(chunks).toString('utf8');
-      let body: Record<string, unknown> = {};
+      let body: Record<string, unknown>;
       try {
         body = JSON.parse(raw) as Record<string, unknown>;
       } catch {
+        // Kept rather than dropped: a body we cannot parse is the interesting
+        // case, and a test asserting on it needs to see what actually arrived.
         body = { unparsed: raw };
       }
 

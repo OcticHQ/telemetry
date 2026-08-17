@@ -1,5 +1,5 @@
 /**
- * octic-telemetry — the PoC distro package.
+ * `@octichq/telemetry` — agent telemetry for Node.
  *
  * No instrumentation. One setup call, and a set of annotations for the things
  * instrumentation cannot see:
@@ -17,7 +17,11 @@
  * The first group sets context and emits no spans; the second emits spans. Both
  * end up as attributes on spans we did not create, by the same mechanism.
  *
- * See ../README.md for what this is trying to prove.
+ * See ./README.md for what this is and how to wire it up.
+ *
+ * This file is on the contract's `handWritten` drift list, so it must not
+ * restate any attribute key the contract owns — import it from
+ * `./attributes.gen.ts` instead. See `contract/README.md`.
  */
 export {
   init,
@@ -69,3 +73,4 @@ export {
   type SpoolStats,
 } from './spool.ts';
 export * from './attributes.ts';
+export { SDK_NAME, SDK_VERSION } from './version.ts';

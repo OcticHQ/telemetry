@@ -127,7 +127,11 @@ describe('what init() puts on the wire', () => {
    */
   it('does not repeat the resource provenance on every span', () => {
     for (const span of collector.spans()) {
-      assert.equal(span.attributes['octic.sdk.name'], undefined, `${span.name} repeated provenance`);
+      assert.equal(
+        span.attributes['octic.sdk.name'],
+        undefined,
+        `${span.name} repeated provenance`,
+      );
       assert.equal(span.attributes['deployment.environment.name'], undefined);
     }
   });

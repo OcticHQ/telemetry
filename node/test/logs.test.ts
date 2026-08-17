@@ -45,7 +45,11 @@ const buildLogs = (content: ContentOptions) => {
   return { exporter, logger: provider.getLogger(FOREIGN_SCOPE) };
 };
 
-const emitted = (content: ContentOptions, body: unknown, attributes: Record<string, string> = {}) => {
+const emitted = (
+  content: ContentOptions,
+  body: unknown,
+  attributes: Record<string, string> = {},
+) => {
   const { exporter, logger } = buildLogs(content);
   logger.emit({ body: body as never, attributes });
   const records = exporter.getFinishedLogRecords();
@@ -120,7 +124,10 @@ describe('log attributes', () => {
 
 describe('octic.redacted on a log record', () => {
   it('is set when the body was withheld', () => {
-    assert.equal(emitted({ capture: 'none' }, { content: CARD }).attributes['octic.redacted'], true);
+    assert.equal(
+      emitted({ capture: 'none' }, { content: CARD }).attributes['octic.redacted'],
+      true,
+    );
   });
 
   it('is set when only an attribute was withheld', () => {
@@ -182,11 +189,11 @@ describe('processor ordering', () => {
 
     const provider = new LoggerProvider({
       processors: [
-        new SimpleLogRecordProcessor({ exporter: serializingExporter as never }),
+        new SimpleLogRecordProcessor({ exporter: serializingExporter }),
         new RedactingLogRecordProcessor(resolvePolicy({ capture: 'none' })),
       ],
     });
-    provider.getLogger(FOREIGN_SCOPE).emit({ body: { content: CARD } as never });
+    provider.getLogger(FOREIGN_SCOPE).emit({ body: { content: CARD } });
 
     assert.ok(
       serialized[0]?.includes('4111'),
@@ -208,10 +215,10 @@ describe('processor ordering', () => {
     const provider = new LoggerProvider({
       processors: [
         new RedactingLogRecordProcessor(resolvePolicy({ capture: 'none' })),
-        new SimpleLogRecordProcessor({ exporter: serializingExporter as never }),
+        new SimpleLogRecordProcessor({ exporter: serializingExporter }),
       ],
     });
-    provider.getLogger(FOREIGN_SCOPE).emit({ body: { content: CARD } as never });
+    provider.getLogger(FOREIGN_SCOPE).emit({ body: { content: CARD } });
 
     assert.ok(!serialized[0]?.includes('4111'));
   });
@@ -221,7 +228,7 @@ describe('the per-run override', () => {
   it('closes content down for one run through the emit context', () => {
     const { exporter, logger } = buildLogs({ capture: 'full' });
     withContent({ capture: 'none' }, () => {
-      logger.emit({ body: { content: CARD } as never });
+      logger.emit({ body: { content: CARD } });
     });
     assert.deepEqual(exporter.getFinishedLogRecords()[0]!.body, { redacted: true });
   });
@@ -229,7 +236,7 @@ describe('the per-run override', () => {
   it('opens content up for one run while the process default is none', () => {
     const { exporter, logger } = buildLogs({ capture: 'none' });
     withContent({ capture: 'full' }, () => {
-      logger.emit({ body: { content: 'keep me' } as never });
+      logger.emit({ body: { content: 'keep me' } });
     });
     assert.deepEqual(exporter.getFinishedLogRecords()[0]!.body, { content: 'keep me' });
   });

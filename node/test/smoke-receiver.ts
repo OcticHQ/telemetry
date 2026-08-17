@@ -23,7 +23,11 @@ const telemetry = init({
   endpoint: process.env.OCTIC_ENDPOINT ?? 'http://127.0.0.1:8400',
   apiKey: process.env.OCTIC_API_KEY ?? 'poc-token',
   serviceName: 'smoke-redaction',
-  agent: { id: 'weather-assistant', name: 'Weather Assistant', assetRef: 'poc/agent/weather-assistant' },
+  agent: {
+    id: 'weather-assistant',
+    name: 'Weather Assistant',
+    assetRef: 'poc/agent/weather-assistant',
+  },
   environment: 'production',
   /**
    * Omitted rather than passed as undefined when the variable is unset, because
@@ -38,45 +42,48 @@ const telemetry = init({
 const vendor = trace.getTracer('@vendor/instrumentation-openai', '0.19.0');
 
 await withIdentity({ conversationId: 'conv-smoke', userId: 'user-42' }, () =>
-  withWorkflow({ name: 'chat-turn', input: { message: 'my card is 4111 1111 1111 1111' } }, async () => {
-    await withPrompt({ template: 'weather-assistant', version: '3' }, async () => {
-      const span = vendor.startSpan('chat gpt-5', {
-        attributes: {
-          'gen_ai.operation.name': 'chat',
-          'gen_ai.request.model': 'gpt-5',
-          'gen_ai.usage.input_tokens': 5200,
-          'gen_ai.usage.output_tokens': 2100,
-          'gen_ai.input.messages':
-            '[{"role":"user","parts":[{"type":"text","content":"my card is 4111 1111 1111 1111"}]}]',
-          'gen_ai.output.messages':
-            '[{"role":"assistant","parts":[{"type":"text","content":"It is 14C in Paris."}]}]',
-        },
+  withWorkflow(
+    { name: 'chat-turn', input: { message: 'my card is 4111 1111 1111 1111' } },
+    async () => {
+      await withPrompt({ template: 'weather-assistant', version: '3' }, async () => {
+        const span = vendor.startSpan('chat gpt-5', {
+          attributes: {
+            'gen_ai.operation.name': 'chat',
+            'gen_ai.request.model': 'gpt-5',
+            'gen_ai.usage.input_tokens': 5200,
+            'gen_ai.usage.output_tokens': 2100,
+            'gen_ai.input.messages':
+              '[{"role":"user","parts":[{"type":"text","content":"my card is 4111 1111 1111 1111"}]}]',
+            'gen_ai.output.messages':
+              '[{"role":"assistant","parts":[{"type":"text","content":"It is 14C in Paris."}]}]',
+          },
+        });
+        span.end();
+
+        /** The other half: instrumentation-openai puts all content here instead. */
+        logs.getLogger('@vendor/instrumentation-openai').emit({
+          attributes: { 'event.name': 'gen_ai.user.message' },
+          body: { content: 'my card is 4111 1111 1111 1111' },
+        });
       });
-      span.end();
 
-      /** The other half: instrumentation-openai puts all content here instead. */
-      logs.getLogger('@vendor/instrumentation-openai').emit({
-        attributes: { 'event.name': 'gen_ai.user.message' },
-        body: { content: 'my card is 4111 1111 1111 1111' },
-      });
-    });
+      /**
+       * A failure whose message quotes the customer's data, which is the ordinary
+       * case rather than a contrived one — an error string is written by code that
+       * was holding the prompt a moment earlier.
+       *
+       * It reaches the wire by two routes at once: `exception.message` and
+       * `exception.stacktrace` as span *event* attributes, and the same text again
+       * on the span status. Both used to bypass redaction entirely, so this is the
+       * span to inspect in receiver/captured/ when checking the fix end to end.
+       */
+      await withTool({ name: 'charge_card', input: { last4: '1111' } }, async () => {
+        throw new Error('declined: card 4111 1111 1111 1111 has insufficient funds');
+      }).catch(() => undefined);
 
-    /**
-     * A failure whose message quotes the customer's data, which is the ordinary
-     * case rather than a contrived one — an error string is written by code that
-     * was holding the prompt a moment earlier.
-     *
-     * It reaches the wire by two routes at once: `exception.message` and
-     * `exception.stacktrace` as span *event* attributes, and the same text again
-     * on the span status. Both used to bypass redaction entirely, so this is the
-     * span to inspect in receiver/captured/ when checking the fix end to end.
-     */
-    await withTool({ name: 'charge_card', input: { last4: '1111' } }, async () => {
-      throw new Error('declined: card 4111 1111 1111 1111 has insufficient funds');
-    }).catch(() => undefined);
-
-    return { reply: 'It is 14C in Paris.' };
-  }),
+      return { reply: 'It is 14C in Paris.' };
+    },
+  ),
 );
 
 await telemetry.forceFlush();
