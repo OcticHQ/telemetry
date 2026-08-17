@@ -5,13 +5,11 @@ document — delete a line when it is done, don't tick it.
 
 ## Before the repository goes public
 
-- [ ] **Reserve `@octicai` on npm.** The scope is claimable by anyone until we
-      claim it, and [ADR 0004](adr/0004-public-npm-and-the-octic-scope.md)
-      depends on having it. Do this first; everything else here is reversible.
-      `@octic` is gone — `octic` is held on npm by an unrelated user, which is
-      what forced the scope. Confirm `@octicai` is actually free before relying
-      on it; the registry does not answer that anonymously.
-- [ ] **Configure npm trusted publishing** for `@octicai/telemetry`, pointing at
+- [ ] **Reserve `@octichq` on npm.** Owning the GitHub org grants nothing on
+      the npm registry — the scope is claimable by anyone until we claim it,
+      and [ADR 0004](adr/0004-public-npm-and-the-octic-scope.md) depends on
+      having it. Do this first; everything else here is reversible.
+- [ ] **Configure npm trusted publishing** for `@octichq/telemetry`, pointing at
       this repository and `.github/workflows/_publish-node.yml`. Without it the
       publish job needs an `NPM_TOKEN` secret and produces no provenance.
 - [ ] **Confirm the CODEOWNERS team slug.** `.github/CODEOWNERS` currently

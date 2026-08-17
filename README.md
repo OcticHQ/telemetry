@@ -24,7 +24,7 @@ the data afterwards.
 
 | SDK | Package | Tag | Status |
 |---|---|---|---|
-| [Node](node) | `@octicai/telemetry` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
+| [Node](node) | `@octichq/telemetry` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
 | Python | `octic-telemetry` (PyPI) | `python/vX.Y.Z` | planned |
 | Go | `github.com/OcticHQ/telemetry/go` | `go/vX.Y.Z` | planned |
 

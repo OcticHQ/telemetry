@@ -12,7 +12,7 @@ Copy [`0000-template.md`](0000-template.md) and add a row below.
 | [0001](0001-one-repo-many-language-sdks.md) | One repository, many language SDKs | accepted |
 | [0002](0002-per-sdk-versioning.md) | Per-SDK versioning via release-please, tags `<component>/vX.Y.Z` | accepted |
 | [0003](0003-attribute-contract-as-a-component.md) | The attribute contract is a component, not a library | accepted |
-| [0004](0004-public-npm-and-the-octic-scope.md) | Public npm under `@octicai`, not GitHub Packages | accepted |
+| [0004](0004-public-npm-and-the-octic-scope.md) | Public npm under `@octichq`, not GitHub Packages | accepted |
 | [0005](0005-no-root-package-manager.md) | No package manager at the repository root | accepted |
 
 ## When to write one

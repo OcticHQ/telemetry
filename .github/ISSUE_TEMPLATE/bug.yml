@@ -18,7 +18,7 @@ body:
     attributes:
       label: SDK
       options:
-        - Node (@octicai/telemetry)
+        - Node (@octichq/telemetry)
     validations:
       required: true
 
