@@ -37,6 +37,12 @@ document — delete a line when it is done, don't tick it.
 - [ ] **Move `telemetry-poc/octic-telemetry/` into `node/`** as one
       `feat(node):` commit, and flip `node/package.json` `private` to `false`
       in the same pull request.
+- [ ] **Drop `publishConfig.tag` when the SDK is ready for `latest`.** It is
+      `beta` so that early publishes cannot become the version `npm install`
+      resolves to — npm assigns `latest` by default no matter what the version
+      string says, so `0.0.1-beta.0` would otherwise land as `latest`. Leaving
+      it set is the mirror failure: a GA release nobody can install without
+      naming a tag. Flip it in the same pull request as `private`.
 - [ ] **Take the PoC's `contract/attributes.yaml` at that moment.** This repo's
       copy was taken at scaffold time and the two drift until then — see the
       note at the bottom of `contract/README.md`, and delete it when it stops

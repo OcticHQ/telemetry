@@ -43,6 +43,7 @@
   },
   "publishConfig": {
     "access": "public",
+    "tag": "beta",
     "provenance": true
   },
   "scripts": {
