@@ -24,7 +24,7 @@ Two consequences that change how you work here versus the backend repos:
 
 ```
 contract/          the cross-language source of truth — start here
-node/              the Node SDK        →  @octic/telemetry
+node/              the Node SDK        →  @octichq/telemetry
 docs/              language-neutral prose
 handbook/          adr/ plans/ TODO.md — internal
 scripts/           bash. change detection, commit lint, registration checks

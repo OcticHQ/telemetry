@@ -1,5 +1,5 @@
 {
-  "name": "@octic/telemetry-contract-tools",
+  "name": "@octichq/telemetry-contract-tools",
   "version": "0.0.0",
   "private": true,
   "description": "Build-time toolchain for the attribute contract. Not published, and not the contract's version — that lives in version.txt.",

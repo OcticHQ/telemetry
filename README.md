@@ -24,9 +24,9 @@ the data afterwards.
 
 | SDK | Package | Tag | Status |
 |---|---|---|---|
-| [Node](node) | `@octic/telemetry` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
+| [Node](node) | `@octichq/telemetry` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
 | Python | `octic-telemetry` (PyPI) | `python/vX.Y.Z` | planned |
-| Go | `github.com/OcticHQ/octic-telemetry/go` | `go/vX.Y.Z` | planned |
+| Go | `github.com/OcticHQ/telemetry/go` | `go/vX.Y.Z` | planned |
 
 Every SDK versions independently. `node` at `2.x` while `python` is at `0.1.0`
 is normal and expected — there is no repo-wide version, and there is no root

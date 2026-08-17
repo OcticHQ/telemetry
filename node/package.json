@@ -1,5 +1,5 @@
 {
-  "name": "@octic/telemetry",
+  "name": "@octichq/telemetry",
   "version": "0.0.0",
   "private": true,
   "description": "Agent telemetry for Node. OTLP wiring, durable identity and agent annotations. Brings no instrumentation of its own.",
@@ -13,13 +13,13 @@
     "agents",
     "genai"
   ],
-  "homepage": "https://github.com/OcticHQ/octic-telemetry/tree/main/node#readme",
+  "homepage": "https://github.com/OcticHQ/telemetry/tree/main/node#readme",
   "bugs": {
-    "url": "https://github.com/OcticHQ/octic-telemetry/issues"
+    "url": "https://github.com/OcticHQ/telemetry/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OcticHQ/octic-telemetry.git",
+    "url": "git+https://github.com/OcticHQ/telemetry.git",
     "directory": "node"
   },
   "license": "Apache-2.0",
@@ -43,6 +43,7 @@
   },
   "publishConfig": {
     "access": "public",
+    "tag": "beta",
     "provenance": true
   },
   "scripts": {

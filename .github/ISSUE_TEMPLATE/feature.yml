@@ -37,6 +37,6 @@ body:
     attributes:
       value: |
         **If this is a new attribute**, note that the contract
-        ([`contract/ATTRIBUTES.md`](https://github.com/OcticHQ/octic-telemetry/blob/main/contract/ATTRIBUTES.md))
+        ([`contract/ATTRIBUTES.md`](https://github.com/OcticHQ/telemetry/blob/main/contract/ATTRIBUTES.md))
         is shared by every SDK and by our ingest path — additions are cheap,
         renames are not.

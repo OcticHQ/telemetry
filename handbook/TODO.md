@@ -5,10 +5,11 @@ document — delete a line when it is done, don't tick it.
 
 ## Before the repository goes public
 
-- [ ] **Reserve `@octic` on npm.** The scope is claimable by anyone until we
-      claim it, and [ADR 0004](adr/0004-public-npm-and-the-octic-scope.md)
-      depends on having it. Do this first; everything else here is reversible.
-- [ ] **Configure npm trusted publishing** for `@octic/telemetry`, pointing at
+- [ ] **Reserve `@octichq` on npm.** Owning the GitHub org grants nothing on
+      the npm registry — the scope is claimable by anyone until we claim it,
+      and [ADR 0004](adr/0004-public-npm-and-the-octic-scope.md) depends on
+      having it. Do this first; everything else here is reversible.
+- [ ] **Configure npm trusted publishing** for `@octichq/telemetry`, pointing at
       this repository and `.github/workflows/_publish-node.yml`. Without it the
       publish job needs an `NPM_TOKEN` secret and produces no provenance.
 - [ ] **Confirm the CODEOWNERS team slug.** `.github/CODEOWNERS` currently
@@ -34,6 +35,12 @@ document — delete a line when it is done, don't tick it.
 - [ ] **Move `telemetry-poc/octic-telemetry/` into `node/`** as one
       `feat(node):` commit, and flip `node/package.json` `private` to `false`
       in the same pull request.
+- [ ] **Drop `publishConfig.tag` when the SDK is ready for `latest`.** It is
+      `beta` so that early publishes cannot become the version `npm install`
+      resolves to — npm assigns `latest` by default no matter what the version
+      string says, so `0.0.1-beta.0` would otherwise land as `latest`. Leaving
+      it set is the mirror failure: a GA release nobody can install without
+      naming a tag. Flip it in the same pull request as `private`.
 - [ ] **Take the PoC's `contract/attributes.yaml` at that moment.** This repo's
       copy was taken at scaffold time and the two drift until then — see the
       note at the bottom of `contract/README.md`, and delete it when it stops

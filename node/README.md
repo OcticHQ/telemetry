@@ -1,4 +1,4 @@
-# @octic/telemetry
+# @octichq/telemetry
 
 Agent telemetry for Node — OTLP wiring, durable identity, and agent
 annotations.
@@ -6,7 +6,7 @@ annotations.
 > **Not published yet.** This package is scaffolding while the SDK is finished
 > in a separate proof of concept. The pipeline below is real; the surface is
 > not. Watch
-> [OcticHQ/octic-telemetry](https://github.com/OcticHQ/octic-telemetry).
+> [OcticHQ/telemetry](https://github.com/OcticHQ/telemetry).
 
 ## What it is, and what it is not
 
@@ -29,7 +29,7 @@ instrumentation, whichever you chose, comes out carrying your identity.
 ## Install
 
 ```bash
-npm install @octic/telemetry @opentelemetry/api
+npm install @octichq/telemetry @opentelemetry/api
 ```
 
 `@opentelemetry/api` is a peer dependency, and exactly one copy of it must
@@ -40,7 +40,7 @@ silently stops working.
 
 ```ts
 // telemetry.ts — imported before anything else
-import { init } from '@octic/telemetry';
+import { init } from '@octichq/telemetry';
 
 init({
   endpoint: 'https://ingest.octic.ai',
@@ -62,7 +62,7 @@ this wrong and the run exits cleanly, reports no error, and produces nothing.
 Then annotate what only your application knows:
 
 ```ts
-import { withIdentity, withWorkflow, withTool, withPrompt } from '@octic/telemetry';
+import { withIdentity, withWorkflow, withTool, withPrompt } from '@octichq/telemetry';
 
 await withIdentity({ conversationId, userId }, () =>
   withWorkflow({ name: 'refund-request', input: message }, () =>
@@ -109,12 +109,12 @@ Set it per process in `init({ content: { capture: 'none' } })`, or per run with
 
 ## Links
 
-- [Repository](https://github.com/OcticHQ/octic-telemetry)
-- [Concepts](https://github.com/OcticHQ/octic-telemetry/blob/main/docs/concepts.md)
-- [Attribute contract](https://github.com/OcticHQ/octic-telemetry/blob/main/contract/ATTRIBUTES.md)
+- [Repository](https://github.com/OcticHQ/telemetry)
+- [Concepts](https://github.com/OcticHQ/telemetry/blob/main/docs/concepts.md)
+- [Attribute contract](https://github.com/OcticHQ/telemetry/blob/main/contract/ATTRIBUTES.md)
   — every key this SDK writes, frozen
-- [Content policy](https://github.com/OcticHQ/octic-telemetry/blob/main/docs/content-policy.md)
-- [Changelog](https://github.com/OcticHQ/octic-telemetry/blob/main/node/CHANGELOG.md)
+- [Content policy](https://github.com/OcticHQ/telemetry/blob/main/docs/content-policy.md)
+- [Changelog](https://github.com/OcticHQ/telemetry/blob/main/node/CHANGELOG.md)
 
 ## Licence
 

@@ -1,5 +1,5 @@
 /**
- * `@octic/telemetry` — agent telemetry for Node.
+ * `@octichq/telemetry` — agent telemetry for Node.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * SCAFFOLD. The SDK itself still lives in the `telemetry-poc` repository, under

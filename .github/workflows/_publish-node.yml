@@ -1,4 +1,4 @@
-# Publish @octic/telemetry to public npm.
+# Publish @octichq/telemetry to public npm.
 #
 # Called by ci.yml only, and only when release-please reports that it created a
 # release for the `node` component — that is, when the Release PR was merged
