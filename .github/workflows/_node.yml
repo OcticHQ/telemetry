@@ -93,7 +93,7 @@ jobs:
 
       - name: Upload lint results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-lint-results
           path: node/lint-results.json
@@ -131,7 +131,7 @@ jobs:
 
       - name: Upload typecheck results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-typecheck-results
           path: node/typecheck-output.txt
@@ -170,7 +170,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-test-results
           path: node/junit.xml
@@ -227,7 +227,7 @@ jobs:
       # So a reviewer can download and open exactly what a publish would send,
       # before the version is permanent.
       - name: Upload tarball
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: node-package-tarball
           path: node/*.tgz
