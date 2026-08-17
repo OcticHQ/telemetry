@@ -1,7 +1,12 @@
-# 0004 — Publish to public npm under `@octic`, not GitHub Packages under `@octichq`
+# 0004 — Publish to public npm under `@octicai`, not GitHub Packages under `@octichq`
 
 - **Status**: accepted
 - **Date**: 2026-08-15
+- **Amended**: 2026-08-17 — the scope is `@octicai`; `@octic` was taken on npm
+  by an unrelated user. Edited in place rather than superseded because only the
+  scope string changed and nothing had been published yet; the decision this
+  record exists for — public npm over GitHub Packages, trusted publishing — is
+  untouched.
 - **Deciders**: platform maintainers
 
 ## Context and problem
@@ -15,7 +20,7 @@ breaks the existing arrangement in two places at once.
 
 ## Decision
 
-**`@octic/telemetry` on public npm.** `@octichq/contracts` stays where it is.
+**`@octicai/telemetry` on public npm.** `@octichq/contracts` stays where it is.
 
 ### Why not GitHub Packages
 
@@ -27,15 +32,22 @@ It is not friction; it is a wall.
 
 ### Why the scope changes
 
-`@octichq` exists because `@octic` was taken on the GitHub org namespace. That
-constraint is GitHub's and does not apply to npm. The published name is the one
-customers type, read in stack traces and search for, so it should be the
-product name.
+`@octichq` exists because `octic` was taken on the GitHub org namespace, and it
+reads as an internal artifact of that collision. The published name is the one
+customers type, read in stack traces and search for, so it should look like the
+product rather than like the workaround.
+
+`@octic` is not available either — `octic` is taken on npm by an unrelated user,
+which we established while setting up the publish. **`@octicai`** is the
+fallback, and it matches the domain customers already reach us at (`octic.ai`)
+more closely than `@octichq` does. The reasoning above is what rules `@octichq`
+out; it does not depend on which of `@octic` or `@octicai` we ended up with.
 
 **This is a one-way door.** Renaming a published npm package is a migration for
 every consumer plus a deprecation shim we would maintain indefinitely. Doing it
 before the first publish is free, which is why this ADR exists now rather than
-when it becomes urgent.
+when it becomes urgent — and why the unavailable scope cost us a `sed` instead
+of a deprecation cycle.
 
 ### Consequence for the contract
 
@@ -60,8 +72,8 @@ no provenance.
 
 ## Consequences
 
-- **Positive**: `npm install @octic/telemetry` works with no setup, which is the
-  entire proposition.
+- **Positive**: `npm install @octicai/telemetry` works with no setup, which is
+  the entire proposition.
 - **Positive**: provenance, and no publish credential to rotate or leak.
 - **Positive**: the npm package page is a real landing page, so `node/README.md`
   is documentation with an audience.
@@ -69,8 +81,9 @@ no provenance.
   next Node package has to know which side it is on.
 - **Negative**: `node/README.md` must be self-contained with absolute links —
   npmjs.com renders it outside the repo and relative links break.
-- **Negative**: the name is claimable by anyone until we claim it. Reserving
-  `@octic` on npm is a prerequisite, not a follow-up.
+- **Negative**: the name is claimable by anyone until we claim it, and `@octic`
+  is the demonstration — someone else holds it. Reserving `@octicai` on npm is a
+  prerequisite, not a follow-up.
 - **Neutral**: the SDK keeps its own copy of contract constants rather than
   importing them, with a generated-file check instead of a dependency.
 

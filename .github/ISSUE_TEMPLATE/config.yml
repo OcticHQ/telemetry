@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/OcticHQ/octic-telemetry/security/advisories/new
+    url: https://github.com/OcticHQ/telemetry/security/advisories/new
     about: Report privately. Do not open a public issue — see SECURITY.md.
   - name: Question about using the SDK
-    url: https://github.com/OcticHQ/octic-telemetry/discussions
+    url: https://github.com/OcticHQ/telemetry/discussions
     about: Setup help, "is this the right way to model X", and anything not yet a bug.

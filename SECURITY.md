@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report privately through
-[GitHub Security Advisories](https://github.com/OcticHQ/octic-telemetry/security/advisories/new).
+[GitHub Security Advisories](https://github.com/OcticHQ/telemetry/security/advisories/new).
 Do not open a public issue.
 
 We aim to acknowledge within two working days.

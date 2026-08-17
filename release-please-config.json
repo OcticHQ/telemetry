@@ -11,7 +11,7 @@
     "node": {
       "release-type": "node",
       "component": "node",
-      "package-name": "@octic/telemetry",
+      "package-name": "@octicai/telemetry",
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["src/version.ts"]
     },
