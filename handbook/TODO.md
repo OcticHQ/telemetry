@@ -1,7 +1,13 @@
 # TODO
 
 Cross-cutting follow-ups that don't deserve their own plan yet. Living
-document — delete a line when it is done, don't tick it.
+document.
+
+Normally a line is deleted when it is done rather than ticked. Through the
+SDK migration the completed ones are ticked and kept instead, so a session
+picking the work up can see what has already been settled without reading the
+git history for it. They get deleted when `0.1.0` ships. Progress across the
+whole migration is tracked in `migration_progress.md`.
 
 ## Before the repository goes public
 
@@ -21,7 +27,7 @@ document — delete a line when it is done, don't tick it.
 - [ ] **Branch ruleset on `main`**: require the PR checks, require review, and
       put the Semantic Release app on the bypass list — release-please pushes
       the release branch and the tag as that identity.
-- [ ] **Set `bootstrap-sha`** in `release-please-config.json` to the scaffold
+- [x] **Set `bootstrap-sha`** in `release-please-config.json` to the scaffold
       commit, so release-please does not walk history that predates it.
 - [ ] Enable **Discussions** (the issue-template config links to it) and
       **private security advisories** (`SECURITY.md` links to it).
@@ -32,20 +38,22 @@ document — delete a line when it is done, don't tick it.
 
 ## Landing the SDK
 
-- [ ] **Move `telemetry-poc/octic-telemetry/` into `node/`** as one
-      `feat(node):` commit, and flip `node/package.json` `private` to `false`
-      in the same pull request.
+- [x] **Move `telemetry-poc/octic-telemetry/` into `node/`** as one
+      `feat(node):` commit. Done — the copy is `4e9dab9`, the lint pass
+      `de6d21e`. `private` stays `true`: publishing is gated on the rest of
+      this section and on the production-readiness work, so the flag flips in
+      the release pull request instead.
 - [ ] **Drop `publishConfig.tag` when the SDK is ready for `latest`.** It is
       `beta` so that early publishes cannot become the version `npm install`
       resolves to — npm assigns `latest` by default no matter what the version
       string says, so `0.0.1-beta.0` would otherwise land as `latest`. Leaving
       it set is the mirror failure: a GA release nobody can install without
       naming a tag. Flip it in the same pull request as `private`.
-- [ ] **Take the PoC's `contract/attributes.yaml` at that moment.** This repo's
+- [x] **Take the PoC's `contract/attributes.yaml` at that moment.** This repo's
       copy was taken at scaffold time and the two drift until then — see the
       note at the bottom of `contract/README.md`, and delete it when it stops
       being true.
-- [ ] **Grow the `handWritten` drift list** in `contract/generate.ts` back to
+- [x] **Grow the `handWritten` drift list** in `contract/generate.ts` back to
       the full set: `attributes.ts`, `content.ts`, `annotations.ts`,
       `identity.ts`, `processor.ts`, `redacting-exporter.ts`,
       `redacting-log-processor.ts`. It is one entry today because those files
@@ -53,8 +61,8 @@ document — delete a line when it is done, don't tick it.
 - [ ] **Carry the loader-hook fix** — the PoC's `init.ts` still calls the
       deprecated `module.register` (Node DEP0205); `svc-raw/telemetry.ts` has
       the working `module.registerHooks` replacement.
-- [ ] Delete the scaffold notice from `node/src/index.ts` and the pre-release
-      banners from both READMEs.
+- [ ] Delete the pre-release banners from both READMEs. (The scaffold notice
+      in `node/src/index.ts` went with the move.)
 - [ ] Add `node/examples/` — a runnable service per instrumentation stack, of
       the kind the PoC's `svc-*` directories already are. Left out of the
       scaffold because there is no API yet to demonstrate.
