@@ -749,11 +749,26 @@ const LANGUAGES: LanguageTarget[] = [
     language: 'node',
     out: 'node/src/attributes.gen.ts',
     emit: contract => emitTypeScript(contract),
-    // Grows as the SDK lands. A file listed here and not readable is an error,
-    // not a skip — a drift list that quietly shrinks is the failure it exists
-    // to prevent. The SDK move adds attributes.ts, content.ts, annotations.ts,
-    // identity.ts, processor.ts and the two redacting-* files.
-    handWritten: ['node/src/index.ts'],
+    // A file listed here and not readable is an error, not a skip — a drift
+    // list that quietly shrinks is the failure it exists to prevent.
+    //
+    // Every hand-written source that reasons about an attribute key belongs
+    // here. The spool pair earns its place for a non-obvious reason: what it
+    // writes to disk is the serialized OTLP body, so a key it named itself
+    // would leak into a file format an external reader parses against
+    // contract/SPOOL.md.
+    handWritten: [
+      'node/src/index.ts',
+      'node/src/attributes.ts',
+      'node/src/content.ts',
+      'node/src/annotations.ts',
+      'node/src/identity.ts',
+      'node/src/processor.ts',
+      'node/src/redacting-exporter.ts',
+      'node/src/redacting-log-processor.ts',
+      'node/src/spool.ts',
+      'node/src/spool-exporter.ts',
+    ],
   },
   // {
   //   language: 'python',

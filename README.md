@@ -3,8 +3,8 @@
 Agent telemetry SDKs for [Octic](https://octic.ai). One repository, one
 attribute contract, one independently versioned SDK per language.
 
-> **Pre-release.** The Node SDK is being finished in a proof of concept and
-> lands here shortly. Nothing is published yet.
+> **Pre-release.** The Node SDK has landed here from the proof of concept and is
+> being made production-ready. Nothing is published yet.
 
 ## What these SDKs are for
 

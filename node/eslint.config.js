@@ -45,9 +45,29 @@ export default defineConfig([
         'error',
         { prefer: 'type-imports', fixStyle: 'inline-type-imports' },
       ],
+
+      // The rule exists to catch `${someObject}` becoming "[object Object]".
+      // A number has one unambiguous string form and the default forbids it,
+      // which turns every byte count and every span count in a diagnostic
+      // message into a `String()` call that reads as noise. Objects, arrays,
+      // `any` and nullables stay banned.
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+
+      // `const { createdAt: _createdAt, ...identity } = manifest` is how you
+      // spell "everything except this field". The binding is the mechanism, not
+      // an oversight.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
     },
   },
 
+  // Tests are held to a different standard than the source, on purpose. Every
+  // rule relaxed below is one whose failure mode in a test is "the test fails
+  // loudly", which is the outcome the rule exists to produce. Nothing that
+  // could let a *wrong assertion pass* is relaxed — `no-unnecessary-type-
+  // assertion`, `no-unsafe-*` on decoded wire data and the rest stay on.
   {
     files: ['test/**/*.ts'],
     rules: {
@@ -55,6 +75,29 @@ export default defineConfig([
       // Every top-level test would otherwise need a `void`, which reads as
       // noise and teaches people to add `void` where it actually matters.
       '@typescript-eslint/no-floating-promises': 'off',
+
+      // Test bodies are `async` because `test()` and the annotations under test
+      // are, not because every one of them awaits something. An `async () => {}`
+      // passed to `withTool` is the shortest way to exercise the void-returning
+      // path, and both of these rules object to it.
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-empty-function': 'off',
+
+      // `spans[0]!.attributes` after asserting the length. Under
+      // `noUncheckedIndexedAccess` the alternative is a guard clause per
+      // lookup; the `!` throws on the same line the assertion would have, so
+      // the diagnostic is no worse and the test stays readable.
+      '@typescript-eslint/no-non-null-assertion': 'off',
+
+      // `() => server.close()` as a cleanup callback. The returned value is
+      // discarded either way and the braces add nothing.
+      '@typescript-eslint/no-confusing-void-expression': 'off',
+
+      // Tests deliberately probe what the types say cannot happen — a `Symbol`
+      // in an attribute map, a missing field on a decoded payload. Type
+      // stripping means none of it is checked at runtime, which is the point of
+      // the test.
+      '@typescript-eslint/no-unnecessary-condition': 'off',
     },
   },
 

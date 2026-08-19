@@ -69,11 +69,4 @@ its emitter. Never hand-translate the constants — that is precisely the drift
 this file exists to prevent, and the `handWritten` list is the check that
 catches it when someone does.
 
-## Until the Node SDK lands here
-
-> **`telemetry-poc/contract/attributes.yaml` is authoritative right now.**
-> This copy was taken from it at scaffold time and the two will drift. The pull
-> request that moves the SDK out of the PoC takes whatever the PoC has at that
-> moment, and this note goes away with it.
-
 See [handbook/adr/0003-attribute-contract-as-a-component.md](../handbook/adr/0003-attribute-contract-as-a-component.md).
