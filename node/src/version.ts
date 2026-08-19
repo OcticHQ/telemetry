@@ -14,7 +14,7 @@
  *
  * The trailing marker comment is load-bearing. Do not remove it.
  */
-export const SDK_VERSION = '0.0.1-beta.0'; // x-release-please-version
+export const SDK_VERSION = '0.1.0-beta.0'; // x-release-please-version
 
 /** The name reported alongside the version, as `octic.sdk.name`. */
 export const SDK_NAME = 'octic-node';
