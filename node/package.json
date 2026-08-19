@@ -1,7 +1,7 @@
 {
   "name": "@octichq/telemetry",
   "version": "0.0.1-beta.0",
-  "private": true,
+  "private": false,
   "description": "Agent telemetry for Node. OTLP wiring, durable identity and agent annotations. Brings no instrumentation of its own.",
   "keywords": [
     "octic",
@@ -43,8 +43,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "beta",
-    "provenance": true
+    "tag": "beta"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
