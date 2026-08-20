@@ -12,9 +12,9 @@ share a repository.**
 | [`CHANGELOG.md`](CHANGELOG.md) | **generated** — owned by release-please |
 
 ```
-attributes.yaml ──generate──┬─► node/src/attributes.gen.ts     the Node SDK
-                            ├─► (later) python/…/attributes_gen.py
-                            └─► ATTRIBUTES.md                  the public spec
+attributes.yaml ──generate──┬─► node/src/attributes.gen.ts          the Node SDK
+                            ├─► python/…/attributes_gen.py          the Python constants
+                            └─► ATTRIBUTES.md                       the public spec
 ```
 
 ## Working on it
