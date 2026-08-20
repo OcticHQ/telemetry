@@ -132,19 +132,38 @@ const enumMemberName = (key: string, member: EnumMember): string =>
 
 const quote = (value: string): string => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
+/** The same for Python, which prefers double quotes and knows nothing of TypeScript's escapes. */
+const pyQuote = (value: string): string =>
+  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+/**
+ * A raw literal, so a regex reaches Python exactly as the contract wrote it.
+ * Raw literals cannot carry an escaped quote or end on a backslash; those fall
+ * back to an ordinary string, where the doubled backslash is the escape rather
+ * than part of the pattern.
+ */
+const pyRaw = (value: string): string =>
+  value.includes('"') || value.endsWith('\\') ? pyQuote(value) : `r"${value}"`;
+
 const attributesOf = (contract: Contract): AttributeSpec[] =>
   contract.groups.flatMap(group => group.attributes ?? []);
 
 const fieldsOf = (contract: Contract): FieldSpec[] =>
   contract.groups.flatMap(group => group.fields ?? []);
 
-/** Wraps a brief into a JSDoc block, so the generated constants read like the hand-written ones. */
-const docComment = (brief: string, note: string | undefined, indent = ''): string => {
-  const words = oneLine(note === undefined ? brief : `${brief} ${note}`).split(' ');
+/** A brief and its note as one sentence, which is how every doc emitter wants them. */
+const prose = (brief: string, note: string | undefined): string =>
+  note === undefined ? brief : `${brief} ${note}`;
+
+/**
+ * Greedy wrap, shared by every doc emitter. One wrapper rather than one per
+ * language, so the same brief cannot come out differently in two SDKs.
+ */
+const wrap = (text: string, width = 76): string[] => {
   const lines: string[] = [];
   let current = '';
-  for (const word of words) {
-    if (current.length + word.length + 1 > 76) {
+  for (const word of oneLine(text).split(' ')) {
+    if (current.length + word.length + 1 > width) {
       lines.push(current);
       current = word;
     } else {
@@ -152,9 +171,45 @@ const docComment = (brief: string, note: string | undefined, indent = ''): strin
     }
   }
   if (current !== '') lines.push(current);
+  return lines;
+};
+
+/** Wraps a brief into a JSDoc block, so the generated constants read like the hand-written ones. */
+const docComment = (brief: string, note: string | undefined, indent = ''): string => {
+  const lines = wrap(prose(brief, note));
   if (lines.length === 1) return `${indent}/** ${lines[0]} */`;
   return [`${indent}/**`, ...lines.map(line => `${indent} * ${line}`), `${indent} */`].join('\n');
 };
+
+/**
+ * The Python equivalent: a string literal directly under the assignment. PEP 224
+ * never made those load-bearing at runtime, but editors and doc tools read them,
+ * which is what the JSDoc above buys the Node constants.
+ *
+ * Raw when the text carries a backslash, and padded when it ends in a quote —
+ * either would otherwise produce a docstring that does not parse.
+ */
+const TRIPLE = '"'.repeat(3);
+
+const pyDoc = (brief: string, note: string | undefined, indent = ''): string => {
+  const text = oneLine(prose(brief, note)).split(TRIPLE).join("'''");
+  const prefix = text.includes('\\') ? 'r' : '';
+  const lines = wrap(text, 76 - indent.length);
+  const last = lines.length - 1;
+  if (lines[last]?.endsWith('"') === true) lines[last] = `${lines[last]} `;
+  if (lines.length === 1) return `${indent}${prefix}${TRIPLE}${lines[0]}${TRIPLE}`;
+  return [
+    `${indent}${prefix}${TRIPLE}`,
+    ...lines.map(line => `${indent}${line}`),
+    `${indent}${TRIPLE}`,
+  ].join('\n');
+};
+
+/** The same wrap as a Python comment block, for the places a docstring cannot go. */
+const pyComment = (text: string, indent = ''): string =>
+  wrap(text, 74 - indent.length)
+    .map(line => `${indent}# ${line}`)
+    .join('\n');
 
 // ── derived views over the contract ─────────────────────────────────────────
 
@@ -509,6 +564,210 @@ const emitTypeScript = (contract: Contract): string => {
   return out.join('\n');
 };
 
+// ── the Python emitter ──────────────────────────────────────────────────────
+
+/**
+ * The same contract as module-level constants, standard library only. Frozen
+ * sequences are tuples because that is Python's `as const`, and nothing here
+ * imports an OpenTelemetry package for the reason the TypeScript file does not:
+ * a constants file that ingest can read without dragging a dependency along.
+ *
+ * One thing this emitter takes on trust. `validate` compiles the content
+ * patterns with `new RegExp`, not with Python's `re`. Both patterns in the
+ * contract today are portable, but a JavaScript-only construct would reach here
+ * as a `re.compile` that raises at import rather than failing the generator.
+ */
+const emitPython = (contract: Contract): string => {
+  const out: string[] = [];
+  const w = (line = ''): void => void out.push(line);
+
+  w(TRIPLE);
+  w('GENERATED — do not edit.');
+  w();
+  w(`Source:     contract/attributes.yaml (schema_version ${contract.schema_version})`);
+  w('Regenerate: node contract/generate.ts');
+  w();
+  w('Everything the SDK writes, everything ingest reads, and the redaction');
+  w('policy shared by both, from one source. The equivalent file for another');
+  w('language is another emitter in the generator, never a translation of this.');
+  w();
+  w('The standard library only, deliberately: nobody should need an');
+  w('OpenTelemetry dependency in front of them to read a string. Semconv-owned');
+  w('keys therefore appear here as literals, under the same constant names the');
+  w('semconv package uses — the generator verifies every one of those names and');
+  w('values against the pinned release on each run.');
+  w(TRIPLE);
+  w();
+  w('import re');
+  w('from typing import Literal');
+  w();
+
+  const constant = (name: string, value: string, brief: string, note?: string): void => {
+    w(`${name} = ${value}`);
+    w(pyDoc(brief, note));
+    w();
+  };
+
+  constant(
+    'OCTIC_SCHEMA_VERSION',
+    pyQuote(String(contract.schema_version)),
+    'Version of the attribute contract this build was generated from. Emitted as octic.schema.version so a consumer can tell a missing attribute from an older SDK.',
+  );
+  constant(
+    'RESERVED_ATTRIBUTE_PREFIX',
+    pyQuote(contract.namespaces.reserved),
+    'Ours. Nothing outside the SDK may write into this namespace.',
+  );
+  constant(
+    'CUSTOMER_ATTRIBUTE_PREFIX',
+    pyQuote(contract.namespaces.customer),
+    'Where tenant-supplied business identifiers land. Separate from the reserved prefix so a customer key can never overwrite one of ours.',
+  );
+
+  for (const group of contract.groups) {
+    const attributes = group.attributes ?? [];
+    if (attributes.length === 0) continue;
+
+    w(`# ── ${group.id} ${'─'.repeat(Math.max(0, 68 - group.id.length))}`);
+    w();
+    for (const attribute of attributes) {
+      const provenance =
+        attribute.owner === 'semconv'
+          ? `Semantic convention, verified against the pinned release as \`${attribute.semconv ?? ''}\`.`
+          : undefined;
+      constant(
+        constantName(attribute.id),
+        pyQuote(attribute.id),
+        attribute.brief,
+        [attribute.note, provenance].filter(Boolean).join(' ') || undefined,
+      );
+
+      for (const member of attribute.enum ?? []) {
+        constant(
+          enumMemberName(attribute.id, member),
+          pyQuote(member.value),
+          member.brief ?? `\`${attribute.id}\` value.`,
+        );
+      }
+
+      if (attribute.enum === undefined) continue;
+      w(`${enumConstantName(attribute.id)}: tuple[str, ...] = (`);
+      for (const member of attribute.enum) {
+        const suffix = member.brief === undefined ? '' : `  # ${oneLine(member.brief)}`;
+        w(`    ${pyQuote(member.value)},${suffix}`);
+      }
+      w(')');
+      w(pyDoc(`Permitted values for \`${attribute.id}\`.`, undefined));
+      w();
+    }
+  }
+
+  const tuple = (name: string, keys: string[], brief: string): void => {
+    w(`${name}: tuple[str, ...] = (`);
+    for (const key of keys) w(`    ${pyQuote(key)},`);
+    w(')');
+    w(pyDoc(brief, undefined));
+    w();
+  };
+
+  w('# ── content policy ──────────────────────────────────────────────────────');
+  w();
+  tuple(
+    'CONTENT_KEYS',
+    contentKeys(contract),
+    'Every key known to carry customer content, across our own output, the vendor keys we read, and vendor keys with no canonical field. Derived from the class column, so this list and the published document cannot disagree.',
+  );
+  w('CONTENT_PATTERNS: tuple[re.Pattern[str], ...] = (');
+  for (const pattern of contract.content.patterns) w(`    re.compile(${pyRaw(pattern)}),`);
+  w(')');
+  w(
+    pyDoc(
+      'The half that catches what the list does not. A denylist alone fails open the day a vendor ships a key we have never seen.',
+      undefined,
+    ),
+  );
+  w();
+  constant(
+    'CONTENT_HEURISTIC_MIN_LENGTH',
+    String(contract.content.heuristic_min_length),
+    'A string longer than this, authored by a scope we do not control, is treated as content whatever it is called.',
+  );
+  tuple(
+    'RESOURCE_DENY',
+    deniedKeys(contract),
+    'Resource attributes nobody asked for. Dropped at the SDK exporter for a customer who runs our SDK, and at ingest for one who does not.',
+  );
+
+  w('# ── wire surface ────────────────────────────────────────────────────────');
+  w();
+  tuple(
+    'EMITTED_ATTRIBUTES',
+    emittedKeys(contract),
+    'Every attribute our SDK is permitted to put on the wire.',
+  );
+  tuple(
+    'INTERNAL_ATTRIBUTES',
+    internalKeys(contract),
+    'Plumbing that must never leave the process. A consumer that sees one of these is looking at output from a broken exporter.',
+  );
+
+  w('SEMCONV_NAMES: dict[str, str] = {');
+  const claims = new Map<string, string>();
+  for (const attribute of attributesOf(contract)) {
+    if (attribute.semconv !== undefined) claims.set(attribute.semconv, attribute.id);
+    for (const member of attribute.enum ?? []) {
+      if (member.semconv !== undefined) claims.set(member.semconv, member.value);
+    }
+  }
+  for (const [name, value] of [...claims].sort(([a], [b]) => (a < b ? -1 : 1))) {
+    w(`    ${pyQuote(name)}: ${pyQuote(value)},`);
+  }
+  w('}');
+  w(
+    pyDoc(
+      'Every constant here that claims to be a semantic convention, mapped to the value semconv must still give it. The generator verifies this against the pinned release on each run, so a port can assert the same thing without resolving a semconv package.',
+      undefined,
+    ),
+  );
+  w();
+
+  w('# ── derived fields (attributes we read but do not own) ───────────────────');
+  w();
+  w('FIELDS: dict[str, dict[str, object]] = {');
+  for (const field of fieldsOf(contract)) {
+    w(pyComment(field.brief, '    '));
+    w(`    ${pyQuote(field.id)}: {`);
+    w(`        ${pyQuote('type')}: ${pyQuote(field.type)},`);
+    // A one-element tuple needs its trailing comma, or it is just a string.
+    const aliases = field.aliases.map(pyQuote).join(', ');
+    w(`        ${pyQuote('aliases')}: (${aliases}${field.aliases.length === 1 ? ',' : ''}),`);
+    if (field.class !== undefined) w(`        ${pyQuote('class')}: ${pyQuote(field.class)},`);
+    if (field.normalize !== undefined) {
+      const entries = Object.entries(field.normalize)
+        .map(([from, to]) => `${pyQuote(from)}: ${pyQuote(to)}`)
+        .join(', ');
+      w(`        ${pyQuote('values')}: {${entries}},`);
+    }
+    w('    },');
+  }
+  w('}');
+  w(
+    pyDoc(
+      'Facts foreign instrumentation records. Each entry is a canonical field, the aliases accepted for it in priority order, and any value normalisation. Resolve a field through this table rather than naming a vendor key directly: an upstream rename then costs an added alias, not a code change.',
+      undefined,
+    ),
+  );
+  w();
+
+  w('DerivedField = Literal[');
+  for (const field of fieldsOf(contract)) w(`    ${pyQuote(field.id)},`);
+  w(']');
+  w(pyDoc('The canonical field names `FIELDS` resolves.', undefined));
+  w();
+
+  return out.join('\n');
+};
+
 // ── the Markdown emitter ────────────────────────────────────────────────────
 
 const cell = (text: string): string => oneLine(text).replace(/\|/g, '\\|');
@@ -770,12 +1029,16 @@ const LANGUAGES: LanguageTarget[] = [
       'node/src/spool-exporter.ts',
     ],
   },
-  // {
-  //   language: 'python',
-  //   out: 'python/src/octic_telemetry/attributes_gen.py',
-  //   emit: contract => emitPython(contract),
-  //   handWritten: ['python/src/octic_telemetry/content.py', …],
-  // },
+  {
+    language: 'python',
+    out: 'python/src/octic_telemetry/attributes_gen.py',
+    emit: contract => emitPython(contract),
+    // Empty until the Python SDK has a hand-written source that reasons about a
+    // key. The first file added here also needs `restatedKeys` taught about `#`
+    // and docstrings — its comment stripper is JavaScript-shaped, and a drift
+    // check that mis-parses reports confidently about the wrong thing.
+    handWritten: [],
+  },
 ];
 
 // ── entry point ─────────────────────────────────────────────────────────────
