@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-beta.0](https://github.com/OcticHQ/telemetry/compare/contract-v0.1.0-beta.0...contract-v0.2.0-beta.0) (2026-08-20)
+
+
+### Features
+
+* **contract:** Added Python attribute generator ([#13](https://github.com/OcticHQ/telemetry/issues/13)) ([4424ddb](https://github.com/OcticHQ/telemetry/commit/4424ddbc75ea5d69af7215439e34d89793d4d1f0))
+
 ## [0.1.0-beta.0](https://github.com/OcticHQ/telemetry/compare/contract-v0.0.1-beta.0...contract-v0.1.0-beta.0) (2026-08-19)
 
 
