@@ -9,7 +9,7 @@
 
 .DEFAULT_GOAL := help
 .PHONY: help check install \
-        contract-generate contract-check \
+        contract-generate contract-generate-local contract-check \
         node-install node-lint node-format node-typecheck node-test node-build node-pack \
         repo-check
 
@@ -26,8 +26,13 @@ check: contract-check repo-check node-lint node-typecheck node-test ## Run what 
 
 # ── contract ─────────────────────────────────────────────────────────────────
 
-contract-generate: ## Regenerate the per-language constants and ATTRIBUTES.md
+contract-generate: ## Regenerate the per-language constants, ATTRIBUTES.md and the contracts artifact
 	npm --prefix contract run generate
+
+# What the pre-commit hook runs. Skips the targets that write into a sibling
+# repository — see the hook comment in .pre-commit-config.yaml.
+contract-generate-local: ## Regenerate this repo's artifacts only
+	npm --prefix contract run generate:local
 
 contract-check: ## Fail if the generated artifacts are stale or a list drifted
 	npm --prefix contract run check
