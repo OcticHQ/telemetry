@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0-beta.1](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0-beta.1...node-v0.3.0-beta.1) (2026-08-23)
+
+
+### Features
+
+* **node:** batch spans and log records ([f1d7602](https://github.com/OcticHQ/telemetry/commit/f1d7602145e67c9636304691a336b05eee06a310))
+
 ## [0.2.0-beta.1](https://github.com/OcticHQ/telemetry/compare/node-v0.1.0-beta.0...node-v0.2.0-beta.1) (2026-08-23)
 
 
