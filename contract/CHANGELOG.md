@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-beta.1](https://github.com/OcticHQ/telemetry/compare/contract-v0.2.0-beta.0...contract-v0.2.0-beta.1) (2026-08-23)
+
+
+### Bug Fixes
+
+* **node:** ensure non-interference with the consuming applications ([#15](https://github.com/OcticHQ/telemetry/issues/15)) ([a77444f](https://github.com/OcticHQ/telemetry/commit/a77444fce1f5baaac2abaa51d0ef04e6e4c6d17d))
+
 ## [0.2.0-beta.0](https://github.com/OcticHQ/telemetry/compare/contract-v0.1.0-beta.0...contract-v0.2.0-beta.0) (2026-08-20)
 
 
