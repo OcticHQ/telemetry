@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0-beta.2](https://github.com/OcticHQ/telemetry/compare/contract-v0.2.0-beta.1...contract-v0.2.0-beta.2) (2026-08-23)
+
+
+### Features
+
+* **contract:** emit the reader half of the contract into @octichq/contracts ([#21](https://github.com/OcticHQ/telemetry/issues/21)) ([9298ae7](https://github.com/OcticHQ/telemetry/commit/9298ae758466af1e5bd6fd00f1a362b40e558000))
+
 ## [0.2.0-beta.1](https://github.com/OcticHQ/telemetry/compare/contract-v0.2.0-beta.0...contract-v0.2.0-beta.1) (2026-08-23)
 
 
