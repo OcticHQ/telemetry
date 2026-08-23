@@ -16,8 +16,9 @@ import type { ExportResult } from '@opentelemetry/core';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import type { Resource } from '@opentelemetry/resources';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
-import type { Attributes } from '@opentelemetry/api';
+import { diag, type Attributes } from '@opentelemetry/api';
 import { TRACER_NAME } from './annotations.ts';
+import { count } from './counters.ts';
 import { ATTR_OCTIC_CONTENT_CAPTURE, ATTR_OCTIC_REDACTED } from './attributes.ts';
 import {
   applyCapture,
@@ -105,13 +106,66 @@ export class RedactingSpanExporter implements SpanExporter {
       // exists, but the type does not say so, and `Promise.all` over a
       // possibly-undefined element hides that from the reader.
       pending.map(span => span.resource.waitForAsyncAttributes?.() ?? Promise.resolve()),
-    ).then(() => {
-      this.inner.export(this.sanitizeAll(spans), resultCallback);
-    });
+    ).then(
+      () => {
+        this.inner.export(this.sanitizeAll(spans), resultCallback);
+      },
+      /**
+       * A rejecting detector must not cost the batch.
+       *
+       * Without this handler the rejection went nowhere: the spans were
+       * dropped *and* `resultCallback` was never called, so a processor
+       * counting in-flight exports waited on a batch that had already been
+       * abandoned. Exporting unwaited is the lesser loss — the resource is
+       * whatever resolved before the failure, which is the same snapshot the
+       * inner exporter would have taken on its own.
+       */
+      (error: unknown) => {
+        diag.warn(
+          'octic-telemetry: resource detection failed; exporting with what resolved',
+          error,
+        );
+        this.inner.export(this.sanitizeAll(spans), resultCallback);
+      },
+    );
   }
 
+  /**
+   * Per span, not per batch. A span the copy cannot be built from is one span;
+   * letting it throw here would lose every other span in the batch and — since
+   * `export` is called from inside the processor — take the throw somewhere
+   * nothing can act on it.
+   */
   private sanitizeAll(spans: ReadableSpan[]): ReadableSpan[] {
-    return spans.map(span => this.sanitize(span));
+    const sanitized: ReadableSpan[] = [];
+
+    for (const span of spans) {
+      try {
+        sanitized.push(this.sanitize(span));
+      } catch (error) {
+        diag.warn('octic-telemetry: a span could not be sanitized; sending it stripped', error);
+        try {
+          /**
+           * Content is the thing that must not leak, so the fallback keeps the
+           * span's identity and drops everything that could carry content.
+           * `events` is set explicitly rather than inherited: a throwing
+           * `events` getter is one of the ways to arrive here, and inheriting
+           * it would reach the same getter again at serialization.
+           */
+          sanitized.push(
+            Object.create(span, {
+              attributes: { value: {}, enumerable: true },
+              events: { value: [], enumerable: true },
+              status: { value: { code: span.status.code }, enumerable: true },
+            }) as ReadableSpan,
+          );
+        } catch {
+          count('spansDropped');
+        }
+      }
+    }
+
+    return sanitized;
   }
 
   /**

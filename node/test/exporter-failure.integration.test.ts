@@ -7,20 +7,22 @@
  *
  * Composed over a real `OTLPTraceExporter` rather than through `init()`, both
  * because the transport is the thing under test and because it leaves the
- * process-wide `initialized` guard free — so this file can exercise four
- * different broken collectors instead of one.
+ * process-wide init latch free — so this file can exercise four different
+ * broken collectors instead of one.
  *
  *   node --test test/
  */
 import assert from 'node:assert/strict';
-import { after, describe, it } from 'node:test';
+import { after, beforeEach, describe, it } from 'node:test';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 import { withWorkflow } from '../src/annotations.ts';
 import { resolvePolicy } from '../src/content.ts';
+import { resetCounters, snapshot } from '../src/counters.ts';
 import { RedactingSpanExporter } from '../src/redacting-exporter.ts';
+import { SafeSpanExporter } from '../src/safe-exporter.ts';
 import {
   CONTENT,
   fakeCollector,
@@ -41,15 +43,27 @@ const CARD = CONTENT['gen_ai.input.messages'];
 const unhandled: unknown[] = [];
 process.on('unhandledRejection', reason => unhandled.push(reason));
 
+beforeEach(() => {
+  resetCounters();
+});
+
 after(() => {
   assert.deepEqual(unhandled, [], 'a failing exporter must not raise an unhandled rejection');
 });
 
 const pipeline = (url: string, capture: 'none' | 'full' = 'none') => {
   const policy = resolvePolicy({ capture });
-  const exporter = new RedactingSpanExporter(
-    new OTLPTraceExporter({ url: `${url}/v1/traces`, concurrencyLimit: 1, timeoutMillis: 300 }),
-    policy,
+  /**
+   * Wrapped the way `init()` wraps it. The guard is the outermost link there,
+   * so a suite that composed the chain without it would be asserting about a
+   * pipeline no consumer runs — and the exactly-once callback property it adds
+   * is exactly the thing these broken collectors are here to stress.
+   */
+  const exporter = new SafeSpanExporter(
+    new RedactingSpanExporter(
+      new OTLPTraceExporter({ url: `${url}/v1/traces`, concurrencyLimit: 1, timeoutMillis: 300 }),
+      policy,
+    ),
   );
   const provider = new NodeTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] });
   return { provider, exporter, policy };
@@ -174,6 +188,42 @@ describe('redaction happens before the transport', () => {
       const wire = JSON.stringify(collector.traces);
       assert.ok(wire.includes('chat gpt-5'), 'the span did reach the transport');
       assert.ok(!wire.includes('4111'), 'but never with content on it');
+    } finally {
+      await collector.close();
+    }
+  });
+});
+
+/**
+ * A guard that turns a crash into a return is only half the work; the other
+ * half is that the return leaves a trace. These are the numbers the eventual
+ * `diagnose()` will publish, and the reason a failing endpoint is diagnosable
+ * today with `OCTIC_TELEMETRY_DEBUG=1` rather than only visible as absence.
+ */
+describe('a suppressed failure is still a counted one', () => {
+  it('counts the failure when the collector refuses the batch', async () => {
+    const collector = await fakeCollector();
+    collector.setStatus(503);
+    try {
+      const { exporter } = await runAgainst(collector.url);
+      await exporter.forceFlush();
+
+      assert.ok(snapshot().exportsFailed > 0, 'the failure was recorded');
+      assert.equal(snapshot().spansAccepted, 0, 'and nothing was claimed as delivered');
+    } finally {
+      await collector.close();
+    }
+  });
+
+  it('counts the spans when the collector takes them', async () => {
+    const collector = await fakeCollector();
+    try {
+      const { exporter } = await runAgainst(collector.url);
+      await exporter.forceFlush();
+      await collector.waitFor(1);
+
+      assert.ok(snapshot().spansAccepted > 0);
+      assert.equal(snapshot().exportsFailed, 0);
     } finally {
       await collector.close();
     }

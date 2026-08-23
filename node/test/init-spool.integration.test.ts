@@ -9,8 +9,8 @@
  * `init()` returns normally, the process makes no HTTP request it cannot
  * authenticate, every batch is on disk, and the handle says where.
  *
- * A file to itself because `initialized` in init.ts is module state that never
- * resets — one `init()` per process is the budget.
+ * A file to itself because init.ts latches on the first call and never re-runs
+ * `setup()` — one effective `init()` per process is the budget.
  *
  *   node --test test/
  */

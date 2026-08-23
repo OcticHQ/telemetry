@@ -13,7 +13,8 @@
  * processor applies it per span instead. That was measured with OpenLLMetry,
  * where the agent came through empty until the fallback existed.
  *
- * Its own file because `initialized` in init.ts is process-wide state.
+ * Its own file because init.ts latches on the first call: `setup()` runs at
+ * most once per process, and a later call warns and reuses what it built.
  *
  *   node --test test/
  */

@@ -1025,6 +1025,7 @@ const LANGUAGES: LanguageTarget[] = [
       'node/src/processor.ts',
       'node/src/redacting-exporter.ts',
       'node/src/redacting-log-processor.ts',
+      'node/src/sanitize.ts',
       'node/src/spool.ts',
       'node/src/spool-exporter.ts',
     ],

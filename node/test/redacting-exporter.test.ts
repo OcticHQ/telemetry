@@ -70,6 +70,37 @@ describe('a resource whose detection is still in flight', () => {
     assert.equal(collector.spans.length, 1);
   });
 
+  /**
+   * The `.then` used to have no rejection handler, so a detector that failed
+   * dropped the batch *and* never called back. The dropped batch is a loss;
+   * the missing callback is worse — a processor counts in-flight exports by
+   * counting callbacks, so it waits forever on spans that were abandoned. Once
+   * PR3 replaces `SimpleSpanProcessor` with a batching one, that is a queue
+   * that stops draining.
+   */
+  it('exports anyway when detection rejects, and settles exactly once', async () => {
+    const pending = {
+      attributes: { 'service.name': 'test' },
+      asyncAttributesPending: true,
+      waitForAsyncAttributes: () => Promise.reject(new Error('detector exploded')),
+    } as unknown as Resource;
+
+    const collector = new CollectingExporter();
+    const exporter = new RedactingSpanExporter(collector, resolvePolicy({ capture: 'none' }));
+
+    let calls = 0;
+    const result = await new Promise<ExportResult>(resolve => {
+      exporter.export([fakeReadableSpan({ resource: pending })], value => {
+        calls += 1;
+        resolve(value);
+      });
+    });
+
+    assert.equal(result.code, ExportResultCode.SUCCESS);
+    assert.equal(collector.spans.length, 1, 'the batch was not dropped');
+    assert.equal(calls, 1);
+  });
+
   it('exports straight through when nothing is pending', async () => {
     const collector = new CollectingExporter();
     const exporter = new RedactingSpanExporter(collector, resolvePolicy({ capture: 'none' }));

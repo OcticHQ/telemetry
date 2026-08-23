@@ -25,6 +25,7 @@ import type { ContextScope } from './context-scope.ts';
 import { identityScope } from './identity.ts';
 import { promptScope } from './prompt.ts';
 import { runScope } from './run.ts';
+import { sanitizeAttributes } from './sanitize.ts';
 
 /**
  * Listed explicitly rather than self-registered on creation. A registry
@@ -56,15 +57,23 @@ export class IdentitySpanProcessor implements SpanProcessor {
   private readonly defaults: Attributes;
 
   constructor(defaults: Attributes = {}) {
-    this.defaults = defaults;
+    /** Fixed for the life of the process, so it is sanitized once, not per span. */
+    this.defaults = sanitizeAttributes(defaults).attributes;
   }
 
   onStart(span: Span, parentContext: Context): void {
+    /**
+     * The scope maps go through the sanitizer first — not because
+     * `setAttributes` would throw on a bad value (it does not; see
+     * sanitize.ts), but because it would drop one without telling anyone whose
+     * value it was. These maps are ours, so the accounting is ours.
+     * `defaults` was sanitized in the constructor.
+     */
     span.setAttributes(this.defaults);
 
     for (const scope of SCOPES) {
       const attributes = scope.attributesFrom(parentContext);
-      if (attributes) span.setAttributes(attributes);
+      if (attributes) span.setAttributes(sanitizeAttributes(attributes).attributes);
     }
 
     /**
