@@ -16,7 +16,7 @@
  * leave the process.
  *
  * Composed over the real exporters rather than through `init()`, because the
- * process-wide `initialized` guard allows exactly one call and this file needs
+ * init latch runs `setup()` at most once per process and this file needs
  * several arrangements.
  *
  *   node --test test/

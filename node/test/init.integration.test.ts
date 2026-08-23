@@ -10,10 +10,11 @@
  * The collector is an in-process HTTP server on an ephemeral port. Real
  * exporters, real HTTP, real JSON — no second process and no API key.
  *
- * This file gets a process to itself because `initialized` in init.ts is module
- * state that never resets, so one `init()` per file is the budget. `node --test`
- * gives one process per file, which is why the integration cases are split up
- * rather than sharing a describe.
+ * This file gets a process to itself because init.ts latches on the first call
+ * and never re-runs `setup()`, so one *effective* `init()` per file is the
+ * budget — later calls warn and hand back the pipeline this one built.
+ * `node --test` gives one process per file, which is why the integration cases
+ * are split up rather than sharing a describe.
  *
  *   node --test test/
  */
@@ -22,7 +23,7 @@ import { after, before, describe, it } from 'node:test';
 import { trace } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 
-import { init, type Telemetry } from '../src/index.ts';
+import { init, initWithExternalProvider, type Telemetry } from '../src/index.ts';
 import { withContent } from '../src/content.ts';
 import { withIdentity } from '../src/identity.ts';
 import { withWorkflow } from '../src/annotations.ts';
@@ -34,6 +35,8 @@ const CARD = 'my card is 4111 1111 1111 1111';
 
 let collector: Awaited<ReturnType<typeof fakeCollector>>;
 let telemetry: Telemetry;
+/** Captured after the first init(), to prove a later call does not replace it. */
+let firstLoggerProvider: ReturnType<typeof logs.getLoggerProvider>;
 
 before(async () => {
   collector = await fakeCollector();
@@ -53,6 +56,7 @@ before(async () => {
     resourceAttributes: { 'octic.custom.tenant': 'acme' },
     content: { capture: 'none' },
   });
+  firstLoggerProvider = logs.getLoggerProvider();
 });
 
 after(async () => {
@@ -187,11 +191,48 @@ describe('the per-run override reaches the real exporter', () => {
 });
 
 describe('the once-per-process guard', () => {
-  it('refuses a second init()', () => {
-    assert.throws(
-      () => init({ endpoint: collector.url, apiKey: 'x', serviceName: 'again' }),
-      /already initialized/,
+  /**
+   * It used to throw. A library crashing an application for being wired twice
+   * is the failure this package promises not to be, and the flag was set
+   * before any work, so one partial failure locked the process out for good
+   * behind a message describing something that had not happened.
+   */
+  it('warns and hands back the working handle instead of throwing', async () => {
+    const again = init({ endpoint: collector.url, apiKey: 'x', serviceName: 'again' });
+
+    /**
+     * Not `assert.equal(again, telemetry)`: the handle is rebuilt from the
+     * same parts each call, so identity is not the property. What matters is
+     * that it drives the pipeline the first call created — which this proves
+     * by flushing a span through it.
+     */
+    const before = collector.traces.length;
+    trace.getTracer(FOREIGN_SCOPE).startSpan('after the second init').end();
+    await again.forceFlush();
+    await collector.waitFor(before + 1);
+
+    assert.ok(
+      collector.spans().some(span => span.name === 'after the second init'),
+      'the handle from the second init() flushes the first pipeline',
     );
+  });
+
+  /**
+   * The cross-mode call is the one with a wrong answer available: rebuilding
+   * from cached parts is the only option that does not register a second
+   * global LoggerProvider, which `setGlobalLoggerProvider` would silently
+   * ignore while we handed back a handle that flushed the dangling one.
+   */
+  it('serves the external-provider shape from the same pipeline', () => {
+    const external = initWithExternalProvider({
+      endpoint: collector.url,
+      apiKey: 'x',
+      serviceName: 'external-after-own',
+    });
+
+    assert.equal(logs.getLoggerProvider(), firstLoggerProvider);
+    assert.ok(external.identityProcessor);
+    assert.ok(external.traceExporter);
   });
 });
 

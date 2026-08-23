@@ -76,9 +76,12 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
       spans producing 51 queue entries, each ~2.2 KB because every export
       re-sends the whole resource block. Breaking-ish: it changes delivery
       timing that tests may depend on.
-- [ ] **Failure behaviour.** A dead endpoint must never take a customer's app
-      down: bounded queue, drop on overflow, no unhandled rejections. This is
-      the one item that is a bug rather than an improvement.
+- [x] **Failure behaviour.** A dead endpoint must never take a customer's app
+      down: no unhandled rejections, no throw out of a processor or exporter
+      callback, `resultCallback` exactly once, and `init()` that returns a
+      handle rather than throwing. Done in the non-interference pull request.
+      The bounded queue and drop-on-overflow half belongs to the batching one —
+      `SimpleSpanProcessor` has no queue to bound.
 - [ ] **Flip the content default from `full` to `none`.** Deliberately opt-out
       while nothing real is connected, and it stops being defensible the moment
       a tenant is onboarded. One line in `content.ts`, a doc pass, and a test
@@ -86,6 +89,32 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
 - [ ] **Decide the OTLP protocol story.** Every PoC stack exports JSON because
       of how the exporter is constructed; a stock exporter sends protobuf by
       default. Pin ours to `http/json` explicitly rather than by accident.
+
+## Found during the non-interference work
+
+- [ ] **`tracerProvider.register()` can silently do nothing.** It discards the
+      boolean from `trace.setGlobalTracerProvider`, which returns `false` when a
+      global provider is already registered — a host SDK that got there first
+      wins, our provider never receives a span, and the handle we return
+      flushes something nothing feeds. Detecting it needs either
+      `@opentelemetry/api`'s private global symbol or reimplementing
+      `register()`'s three lines, which pulls `@opentelemetry/context-async-hooks`
+      from a dev dependency into a runtime one. The cheaper detector is the
+      batching PR's "nothing exported N seconds after the first span" warning,
+      which catches this without either.
+- [ ] **Warn when no `ContextManager` is installed.** A host SDK can register a
+      provider without one; `context.with` then stores nothing, `context.active()`
+      is always ROOT, and every scope in this package stamps nothing while spans
+      keep arriving. Two lines to detect. Belongs with the rest of the
+      observability work (`OCTIC_TELEMETRY_DEBUG`, the README troubleshooting
+      list), not with non-interference — it prevents no crash and swallows
+      nothing.
+- [ ] **Expose the counters as `diagnose()` when there are real tickets.**
+      `src/counters.ts` already maintains `spansAccepted`, `exportsFailed`,
+      `attributesDropped`, `spansDropped`, `processorErrors` and
+      `duplicateCallbacks`. Deliberately not public: a structured health object
+      is a second product surface consumers assert on forever. Ship the shape
+      once support cases say which fields matter.
 
 ## Tooling
 

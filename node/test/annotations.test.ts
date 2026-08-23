@@ -372,6 +372,35 @@ describe('when the wrapped work throws', () => {
     );
   });
 
+  /**
+   * JavaScript permits throwing anything, and `recordException` is not safe on
+   * all of it: given a value with no `code`, `name` or `message` it falls
+   * through to a `diag.warn` that interpolates the value into a template
+   * literal, and a Symbol there raises `TypeError: Cannot convert a Symbol
+   * value to a string`. Unguarded, that TypeError replaced the caller's own
+   * thrown value on the way out — an observability tool rewriting the error it
+   * was watching. `non-interference.test.ts` owns the full set; this is the
+   * one that lives next to the code it guards.
+   */
+  it('propagates a non-Error throw unchanged rather than substituting ours', async () => {
+    const symbol = Symbol('boom');
+    let caught: unknown;
+
+    const collector = await emitting({ capture: 'none' }, async () => {
+      try {
+        await withTool({ name: 'symbol-thrower' }, () => {
+          // eslint-disable-next-line @typescript-eslint/only-throw-error -- the value under test
+          throw symbol;
+        });
+      } catch (error) {
+        caught = error;
+      }
+    });
+
+    assert.equal(caught, symbol);
+    assert.equal(collector.named('execute_tool symbol-thrower').status.code, SpanStatusCode.ERROR);
+  });
+
   it('unwinds the run scope so a later span is not attributed to the failed run', async () => {
     const collector = await emitting({ capture: 'none' }, async () => {
       await assert.rejects(() =>

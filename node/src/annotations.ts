@@ -12,7 +12,7 @@
  * happened in ../../openai-openllmetry, where the tool span reads
  * `{"args":[],"kwargs":{}}`. Making the input explicit removes the trap.
  */
-import { SpanStatusCode, trace, type Attributes } from '@opentelemetry/api';
+import { diag, SpanStatusCode, trace, type Attributes, type Span } from '@opentelemetry/api';
 import {
   ATTR_GEN_AI_DATA_SOURCE_ID,
   ATTR_GEN_AI_OPERATION_NAME,
@@ -133,6 +133,43 @@ interface EntityKeys {
   input: string;
 }
 
+/**
+ * Records a customer's failure on the span without ever becoming one.
+ *
+ * `recordException` is not safe to call on an arbitrary thrown value. Given
+ * something with no `code`, `name` or `message` it falls through to
+ * `` diag.warn(`Failed to record an exception ${exception}`) `` — and a thrown
+ * `Symbol` in that template literal raises `TypeError: Cannot convert a Symbol
+ * value to a string`. That TypeError would then replace the customer's own
+ * thrown value on the way out of the `catch`, which is the exact substitution
+ * this package promises never to make. JavaScript permits throwing anything;
+ * this has to survive all of it.
+ *
+ * `String(error)` is safe for a Symbol specifically — `String()` is the one
+ * conversion the language allows — but it is not safe for an object with a
+ * throwing `toString`, so the whole thing is wrapped rather than only the first
+ * call.
+ */
+const recordFailure = (span: Span, error: unknown): void => {
+  try {
+    span.recordException(error as Error);
+  } catch (recordingFailure) {
+    diag.warn('octic-telemetry: could not record the exception on the span', recordingFailure);
+  }
+
+  try {
+    const message = error instanceof Error ? error.message : String(error);
+    span.setStatus({ code: SpanStatusCode.ERROR, message });
+  } catch {
+    /** The code is what a consumer branches on; losing the message is survivable. */
+    try {
+      span.setStatus({ code: SpanStatusCode.ERROR });
+    } catch {
+      /* Nothing left to try, and the customer's error is still on its way out. */
+    }
+  }
+};
+
 const runEntity = <T>(
   operation: string,
   keys: EntityKeys,
@@ -164,11 +201,13 @@ const runEntity = <T>(
         }
         return result;
       } catch (error) {
-        span.recordException(error as Error);
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: error instanceof Error ? error.message : String(error),
-        });
+        recordFailure(span, error);
+        /**
+         * The customer's error, unchanged — same object, same stack, same
+         * `cause`. Recording it is telemetry and telemetry is never allowed to
+         * alter it. The `finally` below ends the span before this rethrow
+         * reaches the caller, so their own `catch` can already read it.
+         */
         throw error;
       } finally {
         span.end();

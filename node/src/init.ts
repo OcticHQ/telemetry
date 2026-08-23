@@ -11,11 +11,16 @@
 import { register } from 'node:module';
 import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
+import { ExportResultCode } from '@opentelemetry/core';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
-import { SimpleSpanProcessor, type SpanExporter } from '@opentelemetry/sdk-trace-base';
+import {
+  SimpleSpanProcessor,
+  type SpanExporter,
+  type SpanProcessor,
+} from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { agentAttributes, type Agent } from './agent.ts';
@@ -30,6 +35,8 @@ import { resolvePolicy, setActivePolicy, type ContentOptions } from './content.t
 import { IdentitySpanProcessor } from './processor.ts';
 import { RedactingLogRecordProcessor } from './redacting-log-processor.ts';
 import { RedactingSpanExporter } from './redacting-exporter.ts';
+import { SafeLogRecordExporter, SafeSpanExporter } from './safe-exporter.ts';
+import { SafeLogRecordProcessor, SafeSpanProcessor } from './safe-processor.ts';
 import { SpoolingLogRecordExporter, SpoolingSpanExporter } from './spool-exporter.ts';
 import {
   resolveSpoolOptions,
@@ -106,8 +113,15 @@ export interface Telemetry {
 }
 
 export interface ExternalProviderTelemetry {
-  /** Hand both to the host SDK: the processor to enrich, the exporter to ship. */
-  identityProcessor: IdentitySpanProcessor;
+  /**
+   * Hand both to the host SDK: the processor to enrich, the exporter to ship.
+   *
+   * Typed as the interface rather than `IdentitySpanProcessor` because what
+   * you get is the enricher inside a guard that stops it throwing into the
+   * host SDK's `startSpan`. Pass it along; nothing here is meant to be
+   * inspected.
+   */
+  identityProcessor: SpanProcessor;
   /** Redaction-wrapped. Handing over the raw OTLP exporter would bypass policy. */
   traceExporter: SpanExporter;
   /**
@@ -126,8 +140,6 @@ export interface ExternalProviderTelemetry {
    */
   spool?: SpoolHandle;
 }
-
-let initialized = false;
 
 /**
  * `provenanceOnSpans` is for the case where a host SDK owns the provider: the
@@ -149,11 +161,6 @@ const setup = (
   }: InitOptions,
   { provenanceOnSpans }: { provenanceOnSpans: boolean },
 ) => {
-  if (initialized) {
-    throw new Error('octic-telemetry: already initialized.');
-  }
-  initialized = true;
-
   if (process.env.OCTIC_TELEMETRY_DEBUG === '1') {
     diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
   }
@@ -232,7 +239,14 @@ const setup = (
   const contentPolicy = resolvePolicy(content);
   setActivePolicy(contentPolicy);
 
-  const identityProcessor = new IdentitySpanProcessor(provenanceOnSpans ? provenance : {});
+  /**
+   * Wrapped here rather than at each call site so both entry modes get it —
+   * including the one where the processor is handed to a host SDK and this
+   * package never sees it called again.
+   */
+  const identityProcessor = new SafeSpanProcessor(
+    new IdentitySpanProcessor(provenanceOnSpans ? provenance : {}),
+  );
 
   const signalPaths = { traces: '/v1/traces', logs: '/v1/logs' } as const;
   const spoolInstance = spoolConfig.enabled
@@ -268,28 +282,37 @@ const setup = (
   const traceTransport = transport
     ? new OTLPTraceExporter({ url: `${base}${signalPaths.traces}`, headers })
     : undefined;
-  const traceExporter = new RedactingSpanExporter(
-    spoolInstance === undefined
-      ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
-        traceTransport!
-      : new SpoolingSpanExporter({
-          ...(traceTransport === undefined ? {} : { inner: traceTransport }),
-          spool: spoolInstance,
-        }),
-    contentPolicy,
+  /**
+   * `SafeSpanExporter` is the outermost link, not an inner one: exactly-once
+   * `resultCallback` and "a synchronous throw is a FAILED result" are
+   * properties of the whole chain, and PR4 inserts another link into the
+   * middle of it.
+   */
+  const traceExporter = new SafeSpanExporter(
+    new RedactingSpanExporter(
+      spoolInstance === undefined
+        ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
+          traceTransport!
+        : new SpoolingSpanExporter({
+            ...(traceTransport === undefined ? {} : { inner: traceTransport }),
+            spool: spoolInstance,
+          }),
+      contentPolicy,
+    ),
   );
 
   const logTransport = transport
     ? new OTLPLogExporter({ url: `${base}${signalPaths.logs}`, headers })
     : undefined;
-  const logExporter =
+  const logExporter = new SafeLogRecordExporter(
     spoolInstance === undefined
       ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
         logTransport!
       : new SpoolingLogRecordExporter({
           ...(logTransport === undefined ? {} : { inner: logTransport }),
           spool: spoolInstance,
-        });
+        }),
+  );
 
   /**
    * Registered unconditionally: some instrumentation puts no message content on
@@ -304,7 +327,12 @@ const setup = (
      * the redactor must sit ahead of the processor that exports.
      */
     processors: [
-      new RedactingLogRecordProcessor(contentPolicy),
+      /**
+       * Wrapped for the same reason `onStart` is: `onEmit` runs synchronously
+       * inside the customer's `logger.emit()`, and it reaches further — it
+       * mutates the record and it calls the customer's own `redact` hook.
+       */
+      new SafeLogRecordProcessor(new RedactingLogRecordProcessor(contentPolicy)),
       new SimpleLogRecordProcessor({ exporter: logExporter }),
     ],
   });
@@ -331,30 +359,209 @@ const spoolHandle = (spool: Spool | undefined): SpoolHandle | undefined =>
         flush: () => spool.forceFlush(),
       };
 
-export const init = (options: InitOptions): Telemetry => {
-  const { resource, identityProcessor, traceExporter, loggerProvider, spool } = setup(options, {
-    provenanceOnSpans: false,
-  });
+type Parts = ReturnType<typeof setup>;
 
-  const tracerProvider = new NodeTracerProvider({
-    resource,
-    // Simple, not Batch: batching lets a process exit unflushed.
-    spanProcessors: [identityProcessor, new SimpleSpanProcessor(traceExporter)],
-  });
-  tracerProvider.register();
+/**
+ * What this process has already done, so it is never done twice.
+ *
+ * The old guard was a boolean set *before* any work, and it threw. Both halves
+ * were wrong. Throwing is a library taking an application down over telemetry,
+ * and setting the flag first meant a single partial failure locked the process
+ * out permanently behind the message "already initialized", which was not what
+ * had happened.
+ *
+ * The replacement never re-runs `setup()`, because `setup()` is not idempotent
+ * and its non-idempotence is invisible rather than loud:
+ *
+ *   - `register('@opentelemetry/instrumentation/hook.mjs')` would add a second
+ *     ESM loader hook.
+ *   - `logs.setGlobalLoggerProvider` *silently ignores* a second registration
+ *     and keeps the first, so the second LoggerProvider is dangling and the
+ *     handle built around it flushes something no log record reaches.
+ *   - `tracerProvider.register()` behaves the same way.
+ *   - `setActivePolicy` would re-point the module-global policy while the
+ *     first pipeline's exporters still hold the old object.
+ *   - a second `Spool` would take custody of the same directory, with its own
+ *     manifest, eviction and bounds bookkeeping, and the first would never be
+ *     released.
+ *
+ * `degraded` is the case worth naming: `setup()` succeeded — so the global
+ * LoggerProvider is registered and the spool is retained — and something after
+ * it did not. Returning an inert handle there would orphan a live logs
+ * pipeline that nothing could then flush or stop, so the handle keeps the
+ * halves that exist.
+ */
+type State =
+  | { kind: 'own'; parts: Parts; tracerProvider: NodeTracerProvider }
+  | { kind: 'external'; parts: Parts }
+  | { kind: 'degraded'; parts: Parts }
+  | { kind: 'failed' };
 
+let state: State | undefined;
+
+const INERT: Telemetry = {
+  forceFlush: () => Promise.resolve(),
+  shutdown: () => Promise.resolve(),
+};
+
+/** Enough of a `SpanProcessor` to be handed to a host SDK that will call it. */
+const inertProcessor: SpanProcessor = {
+  onStart: () => undefined,
+  onEnd: () => undefined,
+  forceFlush: () => Promise.resolve(),
+  shutdown: () => Promise.resolve(),
+};
+
+const inertExporter: SpanExporter = {
+  export: (_spans, resultCallback) => {
+    resultCallback({
+      code: ExportResultCode.FAILED,
+      error: new Error('octic-telemetry: not initialized'),
+    });
+  },
+  forceFlush: () => Promise.resolve(),
+  shutdown: () => Promise.resolve(),
+};
+
+const INERT_EXTERNAL: ExternalProviderTelemetry = {
+  identityProcessor: inertProcessor,
+  traceExporter: inertExporter,
+  captureContent: false,
+  flushLogs: () => Promise.resolve(),
+  shutdownLogs: () => Promise.resolve(),
+};
+
+/**
+ * The last guard, and the one the layers below do not make redundant.
+ *
+ * `forceFlush` and `shutdown` are the two functions a consumer calls by hand,
+ * usually from their own SIGTERM path, where a rejection is an unhandled
+ * rejection and a clean shutdown becomes a non-zero exit. Guarding our own
+ * exporters is not enough to prevent it: `TracerProvider.forceFlush`
+ * (`sdk-trace/build/src/TracerProvider.js:92-104`) collects whatever its
+ * processors produced and **rejects with an array of errors** — not an Error,
+ * an array — and `SimpleSpanProcessor` hands it a rejected pending export when
+ * the collector refuses the connection. Measured against a dead endpoint: the
+ * process died on an uncaught `[Error: connect ECONNREFUSED]`.
+ *
+ * So the boundary is drawn here too. Whatever the pipeline does, these return.
+ */
+const neverRejects = async (what: string, run: () => Promise<void>): Promise<void> => {
+  try {
+    await run();
+  } catch (error) {
+    diag.warn(`octic-telemetry: ${what} did not complete cleanly`, error);
+  }
+};
+
+const telemetryFrom = (current: State): Telemetry => {
+  if (current.kind === 'failed') return INERT;
+
+  const { loggerProvider, traceExporter, spool } = current.parts;
   const handle = spoolHandle(spool);
+
+  /**
+   * Only the `own` case has a provider of ours to drive. In the other two the
+   * trace exporter is either the host SDK's to call or nobody's, and shutting
+   * it down directly is what releases the spool.
+   */
+  const flushTraces =
+    current.kind === 'own'
+      ? () => current.tracerProvider.forceFlush()
+      : () => traceExporter.forceFlush();
+  const shutdownTraces =
+    current.kind === 'own'
+      ? () => current.tracerProvider.shutdown()
+      : () => traceExporter.shutdown();
+
   return {
+    /**
+     * Both halves are attempted even if the first fails: a trace flush that
+     * cannot reach the collector is no reason to abandon the logs.
+     */
     forceFlush: async () => {
-      await tracerProvider.forceFlush();
-      await loggerProvider.forceFlush();
+      await neverRejects('flushing traces', flushTraces);
+      await neverRejects('flushing logs', () => loggerProvider.forceFlush());
     },
     shutdown: async () => {
-      await tracerProvider.shutdown();
-      await loggerProvider.shutdown();
+      await neverRejects('shutting down traces', shutdownTraces);
+      await neverRejects('shutting down logs', () => loggerProvider.shutdown());
     },
     ...(handle === undefined ? {} : { spool: handle }),
   };
+};
+
+const externalFrom = (current: State): ExternalProviderTelemetry => {
+  if (current.kind === 'failed') return INERT_EXTERNAL;
+
+  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool } = current.parts;
+  const handle = spoolHandle(spool);
+
+  return {
+    identityProcessor,
+    traceExporter,
+    captureContent: contentPolicy.capture !== 'none',
+    flushLogs: () => neverRejects('flushing logs', () => loggerProvider.forceFlush()),
+    shutdownLogs: () => neverRejects('shutting down logs', () => loggerProvider.shutdown()),
+    ...(handle === undefined ? {} : { spool: handle }),
+  };
+};
+
+/**
+ * Warns about a second call and hands back what the first one built.
+ *
+ * The cross-mode warning names the cost rather than hiding it: an
+ * `ExternalProviderTelemetry` rebuilt from an `init()` run carries a processor
+ * constructed with `provenanceOnSpans: false`, so it stamps no per-span
+ * provenance, and the host SDK's resource does not carry it either.
+ */
+const alreadyInitialized = (current: State, wanted: 'own' | 'external'): void => {
+  if (current.kind === 'failed') {
+    diag.warn(
+      'octic-telemetry: a previous init() failed; returning the same inert handle rather than retrying. ' +
+        'Set OCTIC_TELEMETRY_DEBUG=1 to see the original failure.',
+    );
+    return;
+  }
+  if (current.kind === wanted) {
+    diag.warn('octic-telemetry: already initialized; returning the existing handle.');
+    return;
+  }
+  diag.warn(
+    `octic-telemetry: already initialized in "${current.kind}" mode; ignoring this "${wanted}" call ` +
+      'and reusing the existing pipeline. Per-span provenance may be missing.',
+  );
+};
+
+export const init = (options: InitOptions): Telemetry => {
+  if (state !== undefined) {
+    alreadyInitialized(state, 'own');
+    return telemetryFrom(state);
+  }
+
+  /**
+   * The whole body, not only `setup()`. By the time the provider is built,
+   * `setup()` has already registered the global LoggerProvider and retained
+   * the spool — so a failure here is `degraded`, not `failed`.
+   */
+  let parts: Parts | undefined;
+  try {
+    parts = setup(options, { provenanceOnSpans: false });
+
+    const tracerProvider = new NodeTracerProvider({
+      resource: parts.resource,
+      // Simple, not Batch: batching lets a process exit unflushed.
+      spanProcessors: [parts.identityProcessor, new SimpleSpanProcessor(parts.traceExporter)],
+    });
+    tracerProvider.register();
+
+    state = { kind: 'own', parts, tracerProvider };
+  } catch (error) {
+    diag.error('octic-telemetry: init() failed; telemetry is disabled for this process', error);
+    state = parts === undefined ? { kind: 'failed' } : { kind: 'degraded', parts };
+  }
+
+  return telemetryFrom(state);
 };
 
 /**
@@ -362,20 +569,20 @@ export const init = (options: InitOptions): Telemetry => {
  * SDK that owns the provider, no span reaches the endpoint.
  */
 export const initWithExternalProvider = (options: InitOptions): ExternalProviderTelemetry => {
-  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool } = setup(
-    options,
-    {
-      provenanceOnSpans: true,
-    },
-  );
+  if (state !== undefined) {
+    alreadyInitialized(state, 'external');
+    return externalFrom(state);
+  }
 
-  const handle = spoolHandle(spool);
-  return {
-    identityProcessor,
-    traceExporter,
-    captureContent: contentPolicy.capture !== 'none',
-    flushLogs: () => loggerProvider.forceFlush(),
-    shutdownLogs: () => loggerProvider.shutdown(),
-    ...(handle === undefined ? {} : { spool: handle }),
-  };
+  try {
+    state = { kind: 'external', parts: setup(options, { provenanceOnSpans: true }) };
+  } catch (error) {
+    diag.error(
+      'octic-telemetry: initWithExternalProvider() failed; telemetry is disabled for this process',
+      error,
+    );
+    state = { kind: 'failed' };
+  }
+
+  return externalFrom(state);
 };
