@@ -26,6 +26,7 @@ import { identityScope } from './identity.ts';
 import { promptScope } from './prompt.ts';
 import { runScope } from './run.ts';
 import { sanitizeAttributes } from './sanitize.ts';
+import { noteSpanStarted } from './silence-watch.ts';
 
 /**
  * Listed explicitly rather than self-registered on creation. A registry
@@ -62,6 +63,15 @@ export class IdentitySpanProcessor implements SpanProcessor {
   }
 
   onStart(span: Span, parentContext: Context): void {
+    /**
+     * The arming edge for the "nothing is being exported" warning. Here rather
+     * than in the exporting processor because this is the one hook that runs
+     * per span in both entry modes — when a host SDK owns the provider, this
+     * processor is most of what it took from us. It owns no timer even so; the
+     * watch does, and it disarms itself on the first successful export.
+     */
+    noteSpanStarted();
+
     /**
      * The scope maps go through the sanitizer first — not because
      * `setAttributes` would throw on a bad value (it does not; see

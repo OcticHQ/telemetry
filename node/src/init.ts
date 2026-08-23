@@ -15,12 +15,16 @@ import { ExportResultCode } from '@opentelemetry/core';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs';
-import {
-  SimpleSpanProcessor,
-  type SpanExporter,
-  type SpanProcessor,
-} from '@opentelemetry/sdk-trace-base';
+import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
+/**
+ * `BatchSpanProcessor` from `@opentelemetry/sdk-trace`, not from
+ * `@opentelemetry/sdk-trace-base`. The latter re-exports a shim that reads
+ * `OTEL_BSP_*` and whose config type has no `selfObsMeterProvider` — see
+ * batching.ts for why neither is wanted here. Same package, same version;
+ * sdk-trace-base pins it and re-exports most of it already.
+ */
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace';
+import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { agentAttributes, type Agent } from './agent.ts';
@@ -31,12 +35,15 @@ import {
   ATTR_OCTIC_SDK_VERSION,
   OCTIC_SCHEMA_VERSION,
 } from './attributes.ts';
+import { resolveBatchOptions, type BatchOptions } from './batching.ts';
 import { resolvePolicy, setActivePolicy, type ContentOptions } from './content.ts';
 import { IdentitySpanProcessor } from './processor.ts';
 import { RedactingLogRecordProcessor } from './redacting-log-processor.ts';
 import { RedactingSpanExporter } from './redacting-exporter.ts';
 import { SafeLogRecordExporter, SafeSpanExporter } from './safe-exporter.ts';
 import { SafeLogRecordProcessor, SafeSpanProcessor } from './safe-processor.ts';
+import { queueDropMeterProvider } from './self-metrics.ts';
+import { cancelSilenceWatch, configureSilenceWatch } from './silence-watch.ts';
 import { SpoolingLogRecordExporter, SpoolingSpanExporter } from './spool-exporter.ts';
 import {
   resolveSpoolOptions,
@@ -94,6 +101,13 @@ export interface InitOptions {
    * ../../contract/SPOOL.md.
    */
   spool?: SpoolOptions;
+  /**
+   * Queue sizes and delays for both signals. Every field defaults; see
+   * batching.ts. Raising `scheduledDelayMillis` trades freshness for fewer
+   * requests, and is also how much is at risk in a process that exits without
+   * calling `shutdown()`.
+   */
+  batch?: BatchOptions;
 }
 
 export interface SpoolHandle {
@@ -158,6 +172,7 @@ const setup = (
     resourceAttributes = {},
     content,
     spool,
+    batch,
   }: InitOptions,
   { provenanceOnSpans }: { provenanceOnSpans: boolean },
 ) => {
@@ -238,6 +253,13 @@ const setup = (
    */
   const contentPolicy = resolvePolicy(content);
   setActivePolicy(contentPolicy);
+
+  const batchOptions = resolveBatchOptions(batch);
+  /**
+   * Armed by the first span, not by this call — a process that legitimately
+   * produces no telemetry has nothing to warn about.
+   */
+  configureSilenceWatch();
 
   /**
    * Wrapped here rather than at each call site so both entry modes get it —
@@ -333,7 +355,20 @@ const setup = (
        * mutates the record and it calls the customer's own `redact` hook.
        */
       new SafeLogRecordProcessor(new RedactingLogRecordProcessor(contentPolicy)),
-      new SimpleLogRecordProcessor({ exporter: logExporter }),
+      /**
+       * Guarded like the redactor beside it, for the half of the job the
+       * exporter's own guard cannot do: `BatchLogRecordProcessor.forceFlush`
+       * and `.shutdown()` **reject** when a batch fails
+       * (`BatchLogRecordProcessorBase.js`), and both are reachable from the
+       * consumer's own shutdown path.
+       */
+      new SafeLogRecordProcessor(
+        new BatchLogRecordProcessor({
+          exporter: logExporter,
+          ...batchOptions,
+          selfObsMeterProvider: queueDropMeterProvider(),
+        }),
+      ),
     ],
   });
   logs.setGlobalLoggerProvider(loggerProvider);
@@ -344,6 +379,7 @@ const setup = (
     traceExporter,
     loggerProvider,
     contentPolicy,
+    batchOptions,
     spool: spoolInstance,
   };
 };
@@ -440,9 +476,12 @@ const INERT_EXTERNAL: ExternalProviderTelemetry = {
  * exporters is not enough to prevent it: `TracerProvider.forceFlush`
  * (`sdk-trace/build/src/TracerProvider.js:92-104`) collects whatever its
  * processors produced and **rejects with an array of errors** — not an Error,
- * an array — and `SimpleSpanProcessor` hands it a rejected pending export when
- * the collector refuses the connection. Measured against a dead endpoint: the
- * process died on an uncaught `[Error: connect ECONNREFUSED]`.
+ * an array — and a processor hands it one whenever an export fails. Measured
+ * against a dead endpoint under `SimpleSpanProcessor`: the process died on an
+ * uncaught `[Error: connect ECONNREFUSED]`. Batching did not retire the
+ * hazard, it widened it — `BatchSpanProcessor` rejects `forceFlush` and
+ * `shutdown` on a failed batch *and* on its own `exportTimeoutMillis`, so
+ * there are now two ways to reach the same crash.
  *
  * So the boundary is drawn here too. Whatever the pipeline does, these return.
  */
@@ -453,6 +492,19 @@ const neverRejects = async (what: string, run: () => Promise<void>): Promise<voi
     diag.warn(`octic-telemetry: ${what} did not complete cleanly`, error);
   }
 };
+
+/**
+ * One shutdown per process, however many times it is asked for.
+ *
+ * The layers below are individually idempotent — `BatchSpanProcessor` latches
+ * on `_shutdownOnce`, `Spool.shutdown()` checks `shuttingDown` — so a second
+ * call was never destructive. What it was is *slow and misleading*: the second
+ * caller awaits a fresh pass over a pipeline with nothing left in it, and any
+ * warning it produces describes the second call rather than the one that did
+ * the work. A consumer with both a `SIGTERM` handler and a `finally` block has
+ * two callers, and both of them are correct to call it.
+ */
+let shuttingDown: Promise<void> | undefined;
 
 const telemetryFrom = (current: State): Telemetry => {
   if (current.kind === 'failed') return INERT;
@@ -483,9 +535,20 @@ const telemetryFrom = (current: State): Telemetry => {
       await neverRejects('flushing traces', flushTraces);
       await neverRejects('flushing logs', () => loggerProvider.forceFlush());
     },
+    /**
+     * Bounded by `batch.exportTimeoutMillis` per in-flight batch — the queue is
+     * drained in parallel, so the whole flush is one timeout, not one per
+     * batch — and by the OTLP exporter's own retry deadline inside that. It is
+     * safe to `await` on the way out of a service.
+     */
     shutdown: async () => {
-      await neverRejects('shutting down traces', shutdownTraces);
-      await neverRejects('shutting down logs', () => loggerProvider.shutdown());
+      shuttingDown ??= (async () => {
+        /** Before the flush: the pipeline is stopping, so silence is expected. */
+        cancelSilenceWatch();
+        await neverRejects('shutting down traces', shutdownTraces);
+        await neverRejects('shutting down logs', () => loggerProvider.shutdown());
+      })();
+      await shuttingDown;
     },
     ...(handle === undefined ? {} : { spool: handle }),
   };
@@ -502,7 +565,18 @@ const externalFrom = (current: State): ExternalProviderTelemetry => {
     traceExporter,
     captureContent: contentPolicy.capture !== 'none',
     flushLogs: () => neverRejects('flushing logs', () => loggerProvider.forceFlush()),
-    shutdownLogs: () => neverRejects('shutting down logs', () => loggerProvider.shutdown()),
+    /**
+     * Latched like `Telemetry.shutdown`, and it cancels the silence watch for
+     * the same reason: in this mode the host SDK owns the spans, so its own
+     * shutdown is the only signal we get that the process is stopping.
+     */
+    shutdownLogs: async () => {
+      shuttingDown ??= (async () => {
+        cancelSilenceWatch();
+        await neverRejects('shutting down logs', () => loggerProvider.shutdown());
+      })();
+      await shuttingDown;
+    },
     ...(handle === undefined ? {} : { spool: handle }),
   };
 };
@@ -550,8 +624,24 @@ export const init = (options: InitOptions): Telemetry => {
 
     const tracerProvider = new NodeTracerProvider({
       resource: parts.resource,
-      // Simple, not Batch: batching lets a process exit unflushed.
-      spanProcessors: [parts.identityProcessor, new SimpleSpanProcessor(parts.traceExporter)],
+      spanProcessors: [
+        parts.identityProcessor,
+        /**
+         * Guarded for the same reason the logs half is: `forceFlush` and
+         * `shutdown` on a batch processor reject when a batch fails
+         * (`BatchSpanProcessorBase.js:112-117, 149-151`), and the provider
+         * collects those rejections into an *array* it rejects with. The
+         * `neverRejects` guard on the handle catches that too — this one keeps
+         * the failure attributable and counted rather than anonymous.
+         */
+        new SafeSpanProcessor(
+          new BatchSpanProcessor({
+            exporter: parts.traceExporter,
+            ...parts.batchOptions,
+            selfObsMeterProvider: queueDropMeterProvider(),
+          }),
+        ),
+      ],
     });
     tracerProvider.register();
 

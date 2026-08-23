@@ -71,11 +71,14 @@ whole migration is tracked in `migration_progress.md`.
 
 These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
 
-- [ ] **`BatchSpanProcessor` plus an explicit flush on exit.**
+- [x] **`BatchSpanProcessor` plus an explicit flush on exit.**
       `SimpleSpanProcessor` is one HTTP round-trip per span — measured at 51
       spans producing 51 queue entries, each ~2.2 KB because every export
       re-sends the whole resource block. Breaking-ish: it changes delivery
-      timing that tests may depend on.
+      timing that tests may depend on. Done in the batching pull request; see
+      `handbook/plans/001-batch-processors-and-flush.md`. "Flush on exit" is
+      explicitly *not* an exit hook — the application calls `shutdown()`, and
+      the SDK registers no `process` listener, which is now pinned by a test.
 - [x] **Failure behaviour.** A dead endpoint must never take a customer's app
       down: no unhandled rejections, no throw out of a processor or exporter
       callback, `resultCallback` exactly once, and `init()` that returns a
@@ -101,7 +104,9 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
       `register()`'s three lines, which pulls `@opentelemetry/context-async-hooks`
       from a dev dependency into a runtime one. The cheaper detector is the
       batching PR's "nothing exported N seconds after the first span" warning,
-      which catches this without either.
+      which catches this without either — that warning now exists
+      (`node/src/silence-watch.ts`), so this stays open only as the question of
+      whether a *specific* message is still wanted on top of the generic one.
 - [ ] **Warn when no `ContextManager` is installed.** A host SDK can register a
       provider without one; `context.with` then stores nothing, `context.active()`
       is always ROOT, and every scope in this package stamps nothing while spans

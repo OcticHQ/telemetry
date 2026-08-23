@@ -27,6 +27,20 @@ export interface Counters {
   attributesDropped: number;
   /** Spans dropped from a batch because they could not be copied at all. */
   spansDropped: number;
+  /**
+   * Spans and log records the batch processors refused because their queue was
+   * full — the pipeline shedding load rather than growing without bound.
+   *
+   * Counted separately from `spansDropped`, and not merged into it, because the
+   * two say different things to whoever reads them: one is a span this SDK
+   * could not handle, the other is a pipeline that cannot keep up with the
+   * application. The second is fixed with `batch.maxQueueSize`, a faster
+   * collector, or the spool; the first is a bug here.
+   *
+   * The number arrives from inside OpenTelemetry via self-metrics.ts, since the
+   * processors report drops to a meter and to nothing else.
+   */
+  queueDropped: number;
   /** Throws caught at a processor or exporter callback boundary. */
   processorErrors: number;
   /** `resultCallback` invoked more than once by an inner exporter. */
@@ -38,6 +52,7 @@ const zero = (): Counters => ({
   exportsFailed: 0,
   attributesDropped: 0,
   spansDropped: 0,
+  queueDropped: 0,
   processorErrors: 0,
   duplicateCallbacks: 0,
 });

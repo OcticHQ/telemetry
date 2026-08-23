@@ -23,6 +23,7 @@ import { ExportResultCode, type ExportResult } from '@opentelemetry/core';
 import type { LogRecordExporter, ReadableLogRecord } from '@opentelemetry/sdk-logs';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
 import { count } from './counters.ts';
+import { noteExportSucceeded } from './silence-watch.ts';
 
 const asError = (error: unknown): Error =>
   error instanceof Error ? error : new Error(String(error));
@@ -51,6 +52,12 @@ const guardExport = (
 
     if (result.code === ExportResultCode.SUCCESS) {
       if (signal === 'traces') count('spansAccepted', items.length);
+      /**
+       * The disarming edge for the silence warning. "Accepted" is the right
+       * bar, not "delivered over HTTP": under `spool: { mode: 'only' }` nothing
+       * is ever delivered and the pipeline is working exactly as configured.
+       */
+      noteExportSucceeded();
     } else {
       count('exportsFailed');
       diag.warn(`octic-telemetry: ${signal} export failed`, result.error);
