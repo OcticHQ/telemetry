@@ -1,6 +1,6 @@
 {
   "name": "@octichq/telemetry",
-  "version": "0.2.0-beta.1",
+  "version": "0.3.0-beta.1",
   "private": false,
   "description": "Agent telemetry for Node. OTLP wiring, durable identity and agent annotations. Brings no instrumentation of its own.",
   "keywords": [
