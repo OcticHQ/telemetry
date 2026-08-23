@@ -9,6 +9,7 @@
   },
   "scripts": {
     "generate": "node generate.ts",
+    "generate:local": "node generate.ts --no-external",
     "check": "node generate.ts --check"
   },
   "dependencies": {

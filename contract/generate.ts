@@ -19,8 +19,8 @@
  * The language targets are the `LANGUAGES` table near the bottom.
  */
 import { createRequire } from 'node:module';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 
@@ -381,26 +381,47 @@ const validateSemconv = (contract: Contract): string[] => {
 
 // ── the TypeScript emitter ──────────────────────────────────────────────────
 
-const emitTypeScript = (contract: Contract): string => {
+/**
+ * What varies between TypeScript artifacts. The emitter is shared because two
+ * hand-written emitters for one language is the translation this contract
+ * exists to forbid — but a file landing in another repo cannot carry this
+ * repo's header, and has no use for provenance aimed at this repo's tests.
+ */
+interface TypeScriptOptions {
+  /** Header body, one entry per line. `''` becomes a bare ` *`. */
+  header: (contract: Contract) => string[];
+  /** Emit SEMCONV_NAMES. Provenance for contract.test.ts; noise anywhere else. */
+  semconvNames: boolean;
+}
+
+/** The header the in-repo SDK artifact carries. */
+const sdkTypeScriptHeader = (contract: Contract): string[] => [
+  'GENERATED — do not edit.',
+  '',
+  `Source:     contract/attributes.yaml (schema_version ${contract.schema_version})`,
+  'Regenerate: node contract/generate.ts',
+  '',
+  'Everything the SDK writes, everything ingest reads, and the redaction',
+  'policy shared by both, from one source. The equivalent file for another',
+  'language is another emitter in the generator, never a translation of this.',
+  '',
+  'No imports, deliberately. be-ingest and be-worker both need',
+  'these names and none of them should take a semantic-conventions dependency',
+  'to read a string. Semconv-owned keys therefore appear here as literals,',
+  'under the same constant names the semconv package uses — the generator',
+  'verifies every one of those names and values against the pinned release on',
+  'each run, and contract.test.ts asserts it again at test time.',
+];
+
+const emitTypeScript = (
+  contract: Contract,
+  options: TypeScriptOptions = { header: sdkTypeScriptHeader, semconvNames: true },
+): string => {
   const out: string[] = [];
   const w = (line = ''): void => void out.push(line);
 
   w('/**');
-  w(' * GENERATED — do not edit.');
-  w(' *');
-  w(` * Source:     contract/attributes.yaml (schema_version ${contract.schema_version})`);
-  w(' * Regenerate: node contract/generate.ts');
-  w(' *');
-  w(' * Everything the SDK writes, everything ingest reads, and the redaction');
-  w(' * policy shared by both, from one source. The equivalent file for another');
-  w(' * language is another emitter in the generator, never a translation of this.');
-  w(' *');
-  w(' * No imports, deliberately. be-ingest and be-worker both need');
-  w(' * these names and none of them should take a semantic-conventions dependency');
-  w(' * to read a string. Semconv-owned keys therefore appear here as literals,');
-  w(' * under the same constant names the semconv package uses — the generator');
-  w(' * verifies every one of those names and values against the pinned release on');
-  w(' * each run, and contract.test.ts asserts it again at test time.');
+  for (const line of options.header(contract)) w(line === '' ? ' *' : ` * ${line}`);
   w(' */');
   w();
 
@@ -517,23 +538,25 @@ const emitTypeScript = (contract: Contract): string => {
    * failure this whole contract exists to remove; one inside the test that
    * guards the contract would be a poor joke.
    */
-  w(docComment(
-    'Every constant here that claims to be a semantic convention, mapped to the value semconv must still give it. The generator verifies this against the pinned release on each run; contract.test.ts iterates it to verify again at test time.',
-    undefined,
-  ));
-  w('export const SEMCONV_NAMES: Readonly<Record<string, string>> = {');
-  const claims = new Map<string, string>();
-  for (const attribute of attributesOf(contract)) {
-    if (attribute.semconv !== undefined) claims.set(attribute.semconv, attribute.id);
-    for (const member of attribute.enum ?? []) {
-      if (member.semconv !== undefined) claims.set(member.semconv, member.value);
+  if (options.semconvNames) {
+    w(docComment(
+      'Every constant here that claims to be a semantic convention, mapped to the value semconv must still give it. The generator verifies this against the pinned release on each run; contract.test.ts iterates it to verify again at test time.',
+      undefined,
+    ));
+    w('export const SEMCONV_NAMES: Readonly<Record<string, string>> = {');
+    const claims = new Map<string, string>();
+    for (const attribute of attributesOf(contract)) {
+      if (attribute.semconv !== undefined) claims.set(attribute.semconv, attribute.id);
+      for (const member of attribute.enum ?? []) {
+        if (member.semconv !== undefined) claims.set(member.semconv, member.value);
+      }
     }
+    for (const [name, value] of [...claims].sort(([a], [b]) => (a < b ? -1 : 1))) {
+      w(`  ${name}: ${quote(value)},`);
+    }
+    w('};');
+    w();
   }
-  for (const [name, value] of [...claims].sort(([a], [b]) => (a < b ? -1 : 1))) {
-    w(`  ${name}: ${quote(value)},`);
-  }
-  w('};');
-  w();
 
   w('// ── derived fields (attributes we read but do not own) ─────────────────────');
   w();
@@ -1043,6 +1066,127 @@ const LANGUAGES: LanguageTarget[] = [
   },
 ];
 
+// ── external targets ────────────────────────────────────────────────────────
+
+/**
+ * A consumer that lives in a DIFFERENT repository. `@octichq/contracts` needs
+ * the reader half of this contract — the aliases, the normalisations, the
+ * content and deny lists — and hand-copying it there would be the translation
+ * rule 2 forbids. So the generator writes it, and the file is committed on the
+ * far side like any other generated artifact.
+ *
+ * Everything about this is best-effort by design. That checkout is not part of
+ * this repo, is not present in this repo's CI, and is not present for an
+ * outside contributor at all — so an absent target is a SKIP, never a failure.
+ * A target that is present but is not the package we expect is the opposite: a
+ * hard error, because "not here" and "misconfigured" must not look alike.
+ *
+ * The generator never creates directories on the far side. A missing parent
+ * directory inside a checkout that does exist means the layout moved, and
+ * silently minting a tree that nothing reads is worse than stopping.
+ */
+interface ExternalTarget {
+  id: string;
+  defaultRoot: string;
+  out: string;
+  expectPackage: string;
+  emit: (contract: Contract) => string;
+}
+
+/** The header for the artifact that lands in contracts. */
+const contractsTypeScriptHeader = (contract: Contract): string[] => [
+  'GENERATED — do not edit.',
+  '',
+  `Source:     attributes.yaml (schema_version ${contract.schema_version}), octic telemetry repo`,
+  'Regenerate: in that repo, run `make contract-generate`',
+  '',
+  'The reader half of the agent-telemetry attribute contract: canonical fields,',
+  'the vendor aliases accepted for each in priority order, the value',
+  'normalisations, and the keys that are content or denied outright.',
+  '',
+  'No imports, deliberately. This package is config-free and near dependency-',
+  'free, and a contract file that pulled in semantic-conventions would drag it',
+  'into every consumer. The logic over this data is hand-written beside it in',
+  'attributes.ts — only the data is generated.',
+];
+
+const EXTERNAL: ExternalTarget[] = [
+  {
+    id: 'contracts',
+    defaultRoot: join(ROOT, '..', 'contracts'),
+    out: 'src/telemetry/attributes.gen.ts',
+    expectPackage: '@octichq/contracts',
+    emit: contract =>
+      emitTypeScript(contract, { header: contractsTypeScriptHeader, semconvNames: false }),
+  },
+];
+
+/**
+ * Where the sibling checkout is. `--contracts-dir=…` beats
+ * `OCTIC_CONTRACTS_DIR` beats the workspace-relative default. Reading env in a
+ * private build script is fine; it is the consuming package that must stay
+ * config-free.
+ */
+const externalRoot = (target: ExternalTarget): string => {
+  // Relative overrides resolve against the repo root, not the cwd: `npm
+  // --prefix contract run` sets the cwd to contract/, so resolving against it
+  // would make the same `../x` mean different things through make and through
+  // npm. An absolute path passes through either way.
+  const prefix = `--${target.id}-dir=`;
+  const flag = process.argv.find(argument => argument.startsWith(prefix));
+  if (flag !== undefined) return resolve(ROOT, flag.slice(prefix.length));
+  const fromEnv = process.env[`OCTIC_${target.id.toUpperCase()}_DIR`];
+  return fromEnv !== undefined && fromEnv !== '' ? resolve(ROOT, fromEnv) : target.defaultRoot;
+};
+
+/** Contents, or null when the file is absent or unreadable. */
+const readIfPresent = (path: string): string | null => {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return null;
+  }
+};
+
+type Resolution =
+  | { status: 'skip'; note: string }
+  | { status: 'error'; note: string }
+  | { status: 'ready'; path: string; body: string };
+
+const resolveExternal = (target: ExternalTarget, contract: Contract): Resolution => {
+  if (process.argv.includes('--no-external')) {
+    return { status: 'skip', note: `${target.id}: --no-external` };
+  }
+
+  const root = externalRoot(target);
+  const manifest = join(root, 'package.json');
+  if (!existsSync(manifest)) {
+    return { status: 'skip', note: `${target.id}: no checkout at ${root}` };
+  }
+
+  // Present but wrong is a configuration mistake, and a configuration mistake
+  // that writes a file into an unrelated directory is one nobody notices.
+  let name: unknown;
+  try {
+    name = (JSON.parse(readFileSync(manifest, 'utf8')) as { name?: unknown }).name;
+  } catch (error) {
+    return { status: 'error', note: `${target.id}: ${manifest} is unreadable — ${String(error)}` };
+  }
+  if (name !== target.expectPackage) {
+    return {
+      status: 'error',
+      note: `${target.id}: ${root} is ${JSON.stringify(name)}, expected ${target.expectPackage}`,
+    };
+  }
+
+  const path = join(root, target.out);
+  if (!existsSync(dirname(path))) {
+    return { status: 'error', note: `${target.id}: ${dirname(path)} does not exist (not creating it)` };
+  }
+
+  return { status: 'ready', path, body: target.emit(contract) };
+};
+
 // ── entry point ─────────────────────────────────────────────────────────────
 
 const artifacts = (contract: Contract): { path: string; body: string }[] => [
@@ -1065,6 +1209,21 @@ const main = (): void => {
   }
 
   const generated = artifacts(contract);
+  const external = EXTERNAL.map(target => resolveExternal(target, contract));
+  // Reported, and acted on, only after every in-repo artifact — a sibling
+  // checkout must never be able to stop ATTRIBUTES.md being written.
+  const notes = (write: (line: string) => void): boolean => {
+    let failed = false;
+    for (const resolution of external) {
+      if (resolution.status === 'skip') {
+        process.stdout.write(`skipped: ${resolution.note}\n`);
+      } else if (resolution.status === 'error') {
+        write(`error: ${resolution.note}\n`);
+        failed = true;
+      }
+    }
+    return failed;
+  };
 
   if (!process.argv.includes('--check')) {
     for (const { path, body } of generated) {
@@ -1072,6 +1231,26 @@ const main = (): void => {
       writeFileSync(path, body);
       process.stdout.write(`wrote ${relative(ROOT, path)}\n`);
     }
+
+    let failed = notes(line => process.stderr.write(line));
+    for (const resolution of external) {
+      if (resolution.status !== 'ready') continue;
+      // Skip-if-unchanged: regenerating must not dirty a working tree in a repo
+      // the committer was not working in.
+      if (readIfPresent(resolution.path) === resolution.body) {
+        process.stdout.write(`unchanged ${resolution.path}\n`);
+        continue;
+      }
+      try {
+        writeFileSync(resolution.path, resolution.body);
+        process.stdout.write(`wrote ${resolution.path}\n`);
+      } catch (error) {
+        process.stderr.write(`error: ${resolution.path} — ${String(error)}\n`);
+        failed = true;
+      }
+    }
+    if (failed) process.exitCode = 1;
+
     const drift = restatedKeys(contract);
     for (const line of drift) process.stdout.write(`drift: ${line}\n`);
     return;
@@ -1084,15 +1263,26 @@ const main = (): void => {
       return true;
     }
   });
+  // An absent external target is not stale — it is absent, which is this repo's
+  // normal state in its own CI.
+  const externalStale = external.filter(
+    (resolution): resolution is Extract<Resolution, { status: 'ready' }> =>
+      resolution.status === 'ready' && readIfPresent(resolution.path) !== resolution.body,
+  );
   const drift = restatedKeys(contract);
+  const failed = notes(line => process.stderr.write(line));
 
   for (const { path } of stale) {
     process.stderr.write(`stale: ${relative(ROOT, path)} — run: node contract/generate.ts\n`);
   }
+  for (const { path } of externalStale) {
+    process.stderr.write(`stale: ${path} — run: make contract-generate\n`);
+  }
   for (const line of drift) process.stderr.write(`drift: ${line}\n`);
 
-  if (stale.length > 0 || drift.length > 0) process.exitCode = 1;
-  else process.stdout.write('contract is current\n');
+  if (stale.length > 0 || externalStale.length > 0 || drift.length > 0 || failed) {
+    process.exitCode = 1;
+  } else process.stdout.write('contract is current\n');
 };
 
 main();

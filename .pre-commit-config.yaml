@@ -55,9 +55,14 @@ repos:
       #
       # CI never regenerates, only verifies, so the merged commit is the
       # reviewed commit.
+      #
+      # `generate:local`, not `generate`: the external targets write into a
+      # sibling repository, where "the same commit" does not exist. A hook that
+      # silently dirtied another repo's working tree during an unrelated commit
+      # would be a surprise, so those are left to `make contract-generate`.
       - id: contract-generate
         name: contract artifacts are current
-        entry: npm --prefix contract run --silent generate
+        entry: npm --prefix contract run --silent generate:local
         language: system
         pass_filenames: false
         files: ^contract/(attributes\.yaml|generate\.ts)$
