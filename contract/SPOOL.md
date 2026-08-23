@@ -45,9 +45,10 @@ process was configured to let out — `manifest.contentCapture` says which level
 that was, so an operator can tell whether a directory holds customer prompts
 without opening a file. Nothing re-redacts on the way out, and nothing needs to.
 
-One export batch per file. Under the SDK's current `SimpleSpanProcessor` that is
-one span per file; with a `BatchSpanProcessor` in front it is a batch. The format
-does not change either way.
+One export batch per file. How many spans that is belongs to the writer, not to
+this format: the Node SDK batches, so a file typically holds many, but a writer
+exporting one span at a time produces one-span files and is equally correct. A
+reader must not infer a count from a file.
 
 ## The manifest
 
