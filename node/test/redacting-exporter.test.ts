@@ -74,9 +74,9 @@ describe('a resource whose detection is still in flight', () => {
    * The `.then` used to have no rejection handler, so a detector that failed
    * dropped the batch *and* never called back. The dropped batch is a loss;
    * the missing callback is worse — a processor counts in-flight exports by
-   * counting callbacks, so it waits forever on spans that were abandoned. Once
-   * PR3 replaces `SimpleSpanProcessor` with a batching one, that is a queue
-   * that stops draining.
+   * counting callbacks, so it waits forever on spans that were abandoned. Now
+   * that the pipeline batches, that is a queue that stops draining: the
+   * batch processor holds `_isExporting` until a callback it will never get.
    */
   it('exports anyway when detection rejects, and settles exactly once', async () => {
     const pending = {
