@@ -37,12 +37,22 @@ const PERMANENT_STATUSES = new Set([400, 404, 405, 409, 413, 415, 422, 501]);
  * `ExportResult.error` is an `OTLPExporterError` whose `code` is the HTTP
  * status; a connection refused, a DNS failure or a timeout arrives as a plain
  * `Error` with no code at all, which is exactly the case the spool exists for.
+ *
+ * Duck-typed rather than `instanceof OTLPExporterError`, because the class
+ * arrives from whichever copy of `@opentelemetry/otlp-exporter-base` resolved
+ * and an `instanceof` across two copies is false. Shared with the 401 retry in
+ * `auth-retrying-exporter.ts`: one reader of this field, not two that can
+ * disagree about what a status is.
  */
-export const isSpoolable = (error: unknown): boolean => {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return true;
+export const httpStatusOf = (error: unknown): number | undefined => {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
   const code = (error as { code?: unknown }).code;
-  if (typeof code !== 'number') return true;
-  return !PERMANENT_STATUSES.has(code);
+  return typeof code === 'number' ? code : undefined;
+};
+
+export const isSpoolable = (error: unknown): boolean => {
+  const status = httpStatusOf(error);
+  return status === undefined || !PERMANENT_STATUSES.has(status);
 };
 
 export interface SpoolingExporterOptions<T> {

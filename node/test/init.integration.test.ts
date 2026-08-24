@@ -48,7 +48,7 @@ before(async () => {
      * that some gateways 404.
      */
     endpoint: `${collector.url}/`,
-    apiKey: 'poc-token',
+    auth: { kind: 'apiKey', apiKey: 'poc-token' },
     serviceName: 'init-integration',
     serviceVersion: '1.4.0',
     agent: { id: 'weather-assistant', name: 'Weather Assistant', assetRef: 'poc/agent/weather' },
@@ -198,7 +198,11 @@ describe('the once-per-process guard', () => {
    * behind a message describing something that had not happened.
    */
   it('warns and hands back the working handle instead of throwing', async () => {
-    const again = init({ endpoint: collector.url, apiKey: 'x', serviceName: 'again' });
+    const again = init({
+      endpoint: collector.url,
+      auth: { kind: 'apiKey', apiKey: 'x' },
+      serviceName: 'again',
+    });
 
     /**
      * Not `assert.equal(again, telemetry)`: the handle is rebuilt from the
@@ -226,7 +230,7 @@ describe('the once-per-process guard', () => {
   it('serves the external-provider shape from the same pipeline', () => {
     const external = initWithExternalProvider({
       endpoint: collector.url,
-      apiKey: 'x',
+      auth: { kind: 'apiKey', apiKey: 'x' },
       serviceName: 'external-after-own',
     });
 

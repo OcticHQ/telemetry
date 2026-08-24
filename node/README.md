@@ -44,7 +44,7 @@ import { init } from '@octichq/telemetry';
 
 init({
   endpoint: 'https://ingest.octic.ai',
-  apiKey: process.env.OCTIC_API_KEY,
+  auth: { kind: 'apiKey', apiKey: process.env.OCTIC_API_KEY! },
   serviceName: 'checkout-agent',
   agent: { id: 'refunds', name: 'Refunds Agent' },
   environment: 'production',

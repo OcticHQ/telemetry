@@ -44,7 +44,11 @@ describe('the handle a consumer calls by hand', () => {
   const dead = 'http://127.0.0.1:9/';
 
   it('never rejects, even with a batch stuck against a dead collector', async () => {
-    const telemetry = init({ endpoint: dead, apiKey: 'x', serviceName: 'dead-collector' });
+    const telemetry = init({
+      endpoint: dead,
+      auth: { kind: 'apiKey', apiKey: 'x' },
+      serviceName: 'dead-collector',
+    });
 
     await withWorkflow({ name: 'one-request' }, async () => undefined);
 

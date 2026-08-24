@@ -23,6 +23,7 @@
  * restate any attribute key the contract owns — import it from
  * `./attributes.gen.ts` instead. See `contract/README.md`.
  */
+export { type AuthOptions } from './auth.ts';
 export {
   init,
   initWithExternalProvider,
