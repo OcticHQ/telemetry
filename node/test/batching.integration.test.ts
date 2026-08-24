@@ -52,7 +52,7 @@ before(async () => {
 
   telemetry = init({
     endpoint: collector.url,
-    apiKey: 'batching-token',
+    auth: { kind: 'apiKey', apiKey: 'batching-token' },
     serviceName: 'batching-integration',
     content: { capture: 'none' },
     /**

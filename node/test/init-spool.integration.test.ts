@@ -2,8 +2,8 @@
  * `init()` with no credential — the arrangement a consumer lands in by
  * accident, and the one the spool exists for.
  *
- * A container whose secret was not mounted, or a token exchange that has not
- * succeeded yet, leaves `apiKey` undefined. The old behaviour was to send
+ * A container whose secret was not mounted leaves the credential empty — or,
+ * as here, leaves `auth` off altogether. The old behaviour was to send
  * `Bearer undefined`, collect a 401 per batch, and lose everything with only a
  * global-error-handler line to show for it. This asserts the replacement:
  * `init()` returns normally, the process makes no HTTP request it cannot
@@ -38,7 +38,9 @@ before(async () => {
 
   telemetry = init({
     endpoint: collector.url,
-    /** No apiKey, and auth is not 'none' — the accidental case, not a chosen one. */
+    /** No `auth` at all, which is not the same as `auth: 'none'` — the
+     * accidental case, not a chosen one. `auth.test.ts` covers the other
+     * shape of the same accident, a credential that is present and empty. */
     serviceName: 'init-spool',
     environment: 'test',
     content: { capture: 'none' },

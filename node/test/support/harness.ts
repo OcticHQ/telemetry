@@ -337,6 +337,13 @@ export const fakeCollector = async () => {
   const traces: CapturedRequest[] = [];
   const logs: CapturedRequest[] = [];
   let status = 200;
+  /**
+   * A status per request, consumed in order and then exhausted — the shape a
+   * refresh-and-retry needs, where the point is that the *second* attempt is
+   * answered differently from the first. Falls back to `status` once empty, so
+   * `setStatus` keeps meaning what it always meant.
+   */
+  const scripted: number[] = [];
   /** Hold the response open, to exercise an exporter that never hears back. */
   let hang = false;
   /**
@@ -371,7 +378,7 @@ export const fakeCollector = async () => {
       if (captured.url.includes('/v1/logs')) logs.push(captured);
       else traces.push(captured);
 
-      response.writeHead(status, { 'content-type': 'application/json' });
+      response.writeHead(scripted.shift() ?? status, { 'content-type': 'application/json' });
       response.end(JSON.stringify({ partialSuccess: {} }));
     });
   });
@@ -400,6 +407,11 @@ export const fakeCollector = async () => {
     setStatus: (code: number) => {
       status = code;
     },
+    /** e.g. `setStatuses([401, 200])`: refuse once, then accept. */
+    setStatuses: (codes: readonly number[]) => {
+      scripted.length = 0;
+      scripted.push(...codes);
+    },
     setHang: (value: boolean) => {
       hang = value;
     },
@@ -409,6 +421,100 @@ export const fakeCollector = async () => {
       while (traces.length + logs.length < count) {
         if (Date.now() > deadline) {
           throw new Error(`only ${traces.length + logs.length} of ${count} requests arrived`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    },
+    close: () =>
+      new Promise<void>(resolve => {
+        server.closeAllConnections();
+        server.close(() => resolve());
+      }),
+  };
+};
+
+/**
+ * be-api's `/v1/ingest/token`, in-process.
+ *
+ * A second server rather than another route on `fakeCollector`, because the
+ * token endpoint and the OTLP endpoint are different services on different
+ * hosts in production. One origin serving both would let a `tokenUrl` wired to
+ * the ingest host pass a test and fail everywhere else.
+ *
+ * Mints a distinct token per exchange, which is what lets a test assert that
+ * the retry carried a *different* bearer rather than merely a second one.
+ */
+export const fakeTokenEndpoint = async ({ ttlSeconds = 900 }: { ttlSeconds?: number } = {}) => {
+  const issued: string[] = [];
+  const bodies: Record<string, unknown>[] = [];
+  let status = 200;
+  let ttl = ttlSeconds;
+  /** Answer 200 with something that is not a token — a proxy's login page, say. */
+  let garbage = false;
+
+  const server: Server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on('data', chunk => chunks.push(chunk as Buffer));
+    request.on('end', () => {
+      try {
+        bodies.push(JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<string, unknown>);
+      } catch {
+        bodies.push({});
+      }
+
+      if (status !== 200) {
+        response.writeHead(status, { 'content-type': 'application/json' });
+        response.end(
+          JSON.stringify({
+            error: {
+              statusCode: status,
+              message: 'Unauthorized',
+              errorCode: 'INVALID_ENROLLMENT_TOKEN',
+            },
+          }),
+        );
+        return;
+      }
+
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });
+      if (garbage) {
+        response.end('<html>login</html>');
+        return;
+      }
+
+      const accessToken = `token-${issued.length + 1}`;
+      issued.push(accessToken);
+      /** be-api's exact response shape, `tokenType` included. */
+      response.end(JSON.stringify({ accessToken, tokenType: 'Bearer', expiresIn: ttl }));
+    });
+  });
+
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  if (address === null || typeof address === 'string') throw new Error('no port');
+
+  return {
+    url: `http://127.0.0.1:${address.port}/v1/ingest/token`,
+    /** Tokens handed out, in order. */
+    issued: () => [...issued],
+    /** Exchange request bodies, so a test can assert the enrollment token was sent. */
+    bodies: () => [...bodies],
+    /** Requests that reached the handler, answered or refused. */
+    requestCount: () => bodies.length,
+    setStatus: (code: number) => {
+      status = code;
+    },
+    setTtlSeconds: (seconds: number) => {
+      ttl = seconds;
+    },
+    setGarbage: (value: boolean) => {
+      garbage = value;
+    },
+    waitFor: async (count: number, timeoutMs = 2000): Promise<void> => {
+      const deadline = Date.now() + timeoutMs;
+      while (bodies.length < count) {
+        if (Date.now() > deadline) {
+          throw new Error(`only ${bodies.length} of ${count} exchanges arrived`);
         }
         await new Promise(resolve => setTimeout(resolve, 10));
       }

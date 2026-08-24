@@ -38,17 +38,29 @@ The token is short-lived and obtained by exchanging a tenant enrollment token:
 ```
 POST <api>/v1/ingest/token
 { "enrollmentToken": "octic_et_…" }
-→ { "accessToken": "eyJ…", "expiresIn": 900 }
+→ { "accessToken": "eyJ…", "tokenType": "Bearer", "expiresIn": 900 }
 ```
+
+`expiresIn` is seconds, and it is the API's number rather than a constant of
+this contract — 900 is the default and a deployment can set any lifetime up to
+an hour. Read it; do not assume it. The exchange is unauthenticated apart from
+the enrollment token in the body, and an enrollment token that is unknown,
+revoked, or belongs to a deleted tenant gets the same uniform 401 — there is no
+oracle that distinguishes them.
 
 The result is an EdDSA JWT carrying the tenant. Ingest verifies it statelessly
 against a published JWKS — there is no revocation lookback, so a revoked token
-stops working within one token lifetime rather than immediately.
+stops working within one token lifetime rather than immediately. Every
+verification failure at ingest, expiry included, is one 401: the status is what
+tells a client to refresh and retry, and a 403 would not.
 
 **Because the token expires, an integration needs something that renews it.**
 That is one of the reasons the SDK exists rather than a documented curl
 snippet: a static credential pasted into an exporter config would stop working
-mid-run.
+mid-run. The Node SDK does this with
+`auth: { kind: 'enrollmentToken', enrollmentToken, tokenUrl }` — it exchanges
+on startup, renews at half the token's life, and retries an export once with a
+fresh token when ingest answers 401.
 
 For consumers who cannot run an SDK, a long-lived key branch is planned; until
 it exists, that path is not supported.

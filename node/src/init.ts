@@ -15,7 +15,11 @@ import { ExportResultCode } from '@opentelemetry/core';
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { BatchLogRecordProcessor, LoggerProvider } from '@opentelemetry/sdk-logs';
+import {
+  BatchLogRecordProcessor,
+  LoggerProvider,
+  type LogRecordExporter,
+} from '@opentelemetry/sdk-logs';
 /**
  * `BatchSpanProcessor` from `@opentelemetry/sdk-trace`, not from
  * `@opentelemetry/sdk-trace-base`. The latter re-exports a shim that reads
@@ -28,6 +32,11 @@ import type { SpanExporter, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from '@opentelemetry/semantic-conventions';
 import { agentAttributes, type Agent } from './agent.ts';
+import {
+  AuthRetryingLogRecordExporter,
+  AuthRetryingSpanExporter,
+} from './auth-retrying-exporter.ts';
+import { resolveAuth, type AuthOptions } from './auth.ts';
 import {
   ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
   ATTR_OCTIC_SCHEMA_VERSION,
@@ -45,6 +54,7 @@ import { SafeLogRecordProcessor, SafeSpanProcessor } from './safe-processor.ts';
 import { queueDropMeterProvider } from './self-metrics.ts';
 import { cancelSilenceWatch, configureSilenceWatch } from './silence-watch.ts';
 import { SpoolingLogRecordExporter, SpoolingSpanExporter } from './spool-exporter.ts';
+import { TokenManager } from './token-manager.ts';
 import {
   resolveSpoolOptions,
   Spool,
@@ -60,19 +70,19 @@ export interface InitOptions {
   /** Base URL of the collector. `/v1/traces` and `/v1/logs` are appended. */
   endpoint: string;
   /**
-   * Required unless `auth: 'none'`. A missing key is not fatal — it disables the
+   * How this process authenticates to ingest. Three shapes, in `auth.ts`:
+   * `{ kind: 'apiKey', apiKey }` sends a long-lived key verbatim,
+   * `{ kind: 'enrollmentToken', enrollmentToken, tokenUrl }` exchanges a tenant
+   * enrollment token for short-lived ingest JWTs and keeps renewing them, and
+   * `'none'` sends no credential at all — what a local forwarder expects.
+   *
+   * A credential that is absent or empty is not fatal: it disables the
    * transport and turns the spool on, because a process that cannot
-   * authenticate can still keep its telemetry.
+   * authenticate can still keep its telemetry. Nothing about the spool changes
+   * between the modes except that `'none'` and a missing credential turn it on
+   * by default.
    */
-  apiKey?: string;
-  /**
-   * `apiKey` (default) sends `authorization: Bearer <apiKey>`. `none` sends no
-   * credential at all, which is what a local forwarder — an OTel Collector on
-   * loopback — expects, and what a consumer who does not want to hold a token
-   * asks for. Nothing about the spool changes between them except that `none`
-   * turns it on by default.
-   */
-  auth?: 'apiKey' | 'none';
+  auth?: AuthOptions;
   serviceName: string;
   serviceVersion?: string;
   /**
@@ -163,8 +173,7 @@ export interface ExternalProviderTelemetry {
 const setup = (
   {
     endpoint,
-    apiKey,
-    auth = 'apiKey',
+    auth,
     serviceName,
     serviceVersion = '0.0.0',
     agent,
@@ -221,30 +230,60 @@ const setup = (
   });
 
   /**
-   * A missing key under `auth: 'apiKey'` is a real deployment — a container
-   * whose secret was not mounted, a token exchange that has not succeeded yet.
+   * A missing credential is a real deployment — a container whose secret was
+   * not mounted, an operator who has not issued an enrollment token yet.
    * Throwing takes the consumer's process down over telemetry; sending
    * `Bearer undefined` produces a 401 per batch and loses everything. So the
    * transport is switched off and the spool takes custody instead, which is the
    * whole reason it exists.
+   *
+   * An enrollment token counts as credentialed even though there is no token
+   * yet: the first exchange has not resolved when this line runs, and treating
+   * "not minted yet" as "no credential" would pin the process to `mode: 'only'`
+   * for its whole life over a round trip that takes milliseconds.
    */
-  const credentialed = auth === 'none' || (apiKey !== undefined && apiKey !== '');
-  if (!credentialed) {
+  const resolvedAuth = resolveAuth(auth);
+  if (resolvedAuth.mode === 'missing') {
     diag.warn(
-      'octic-telemetry: no apiKey and auth is not "none"; not exporting over HTTP. ' +
+      `octic-telemetry: ${resolvedAuth.reason}; not exporting over HTTP. ` +
         'Telemetry will be spooled to disk for the reader to deliver.',
     );
   }
+  const credentialed = resolvedAuth.mode !== 'missing';
 
   const spoolConfig = resolveSpoolOptions(spool, {
-    enabledByDefault: auth === 'none' || !credentialed || spool?.mode === 'only',
+    enabledByDefault: resolvedAuth.mode === 'none' || !credentialed || spool?.mode === 'only',
   });
   /** Nothing to fall back *from* when there is no credential. */
   const spoolMode: SpoolMode = credentialed ? spoolConfig.mode : 'only';
   const transport = spoolConfig.enabled ? spoolMode !== 'only' : true;
 
+  /**
+   * Only built when there is something for it to authenticate: under
+   * `mode: 'only'` nothing is sent, and minting tokens for a transport that
+   * does not exist is traffic at the control plane for no reason.
+   */
+  const tokenManager =
+    resolvedAuth.mode === 'enrollmentToken' && transport
+      ? new TokenManager({
+          enrollmentToken: resolvedAuth.enrollmentToken,
+          tokenUrl: resolvedAuth.tokenUrl,
+        })
+      : undefined;
+  /** Not awaited — see `TokenManager.start`. `setup()` stays synchronous. */
+  tokenManager?.start();
+
+  /**
+   * A function, not an object, in enrollment-token mode. The pinned exporter
+   * awaits `headers()` before every send, which is the hook that lets a token
+   * minted after `init()` reach a request that was configured before it.
+   */
   const headers =
-    auth === 'none' || apiKey === undefined ? {} : { authorization: `Bearer ${apiKey}` };
+    tokenManager !== undefined
+      ? tokenManager.headers
+      : resolvedAuth.mode === 'apiKey'
+        ? { authorization: `Bearer ${resolvedAuth.apiKey}` }
+        : {};
   const base = endpoint.replace(/\/$/, '');
 
   /**
@@ -301,8 +340,31 @@ const setup = (
    * it properly means either restructuring this branch or throwing when both
    * are missing — a behaviour change, so not in this pull request.
    */
+  /**
+   * `AuthRetrying*` goes here, between the OTLP exporter and everything above
+   * it: inside the spool, so a 401 the retry fixes never touches disk, and
+   * still above nothing, so a 401 that survives the retry spools like any other
+   * transient failure. Absent in the other two auth modes — re-sending a static
+   * key that was just refused only produces a second 401.
+   */
+  const withAuthRetry = <T>(
+    inner: T,
+    wrap: (options: { inner: T; tokens: TokenManager; endpointUrl: string; tokenUrl: string }) => T,
+  ): T =>
+    tokenManager === undefined || resolvedAuth.mode !== 'enrollmentToken'
+      ? inner
+      : wrap({
+          inner,
+          tokens: tokenManager,
+          endpointUrl: base,
+          tokenUrl: resolvedAuth.tokenUrl,
+        });
+
   const traceTransport = transport
-    ? new OTLPTraceExporter({ url: `${base}${signalPaths.traces}`, headers })
+    ? withAuthRetry<SpanExporter>(
+        new OTLPTraceExporter({ url: `${base}${signalPaths.traces}`, headers }),
+        options => new AuthRetryingSpanExporter(options),
+      )
     : undefined;
   /**
    * `SafeSpanExporter` is the outermost link, not an inner one: exactly-once
@@ -324,7 +386,10 @@ const setup = (
   );
 
   const logTransport = transport
-    ? new OTLPLogExporter({ url: `${base}${signalPaths.logs}`, headers })
+    ? withAuthRetry<LogRecordExporter>(
+        new OTLPLogExporter({ url: `${base}${signalPaths.logs}`, headers }),
+        options => new AuthRetryingLogRecordExporter(options),
+      )
     : undefined;
   const logExporter = new SafeLogRecordExporter(
     spoolInstance === undefined
@@ -381,6 +446,7 @@ const setup = (
     contentPolicy,
     batchOptions,
     spool: spoolInstance,
+    tokenManager,
   };
 };
 
@@ -509,7 +575,7 @@ let shuttingDown: Promise<void> | undefined;
 const telemetryFrom = (current: State): Telemetry => {
   if (current.kind === 'failed') return INERT;
 
-  const { loggerProvider, traceExporter, spool } = current.parts;
+  const { loggerProvider, traceExporter, spool, tokenManager } = current.parts;
   const handle = spoolHandle(spool);
 
   /**
@@ -545,6 +611,12 @@ const telemetryFrom = (current: State): Telemetry => {
       shuttingDown ??= (async () => {
         /** Before the flush: the pipeline is stopping, so silence is expected. */
         cancelSilenceWatch();
+        /**
+         * After the timer, before the flush: the flush still needs a header, so
+         * this only stops the *next* refresh and abandons an exchange that is
+         * in flight — it never takes a token away from a batch on its way out.
+         */
+        tokenManager?.shutdown();
         await neverRejects('shutting down traces', shutdownTraces);
         await neverRejects('shutting down logs', () => loggerProvider.shutdown());
       })();
@@ -557,7 +629,8 @@ const telemetryFrom = (current: State): Telemetry => {
 const externalFrom = (current: State): ExternalProviderTelemetry => {
   if (current.kind === 'failed') return INERT_EXTERNAL;
 
-  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool } = current.parts;
+  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool, tokenManager } =
+    current.parts;
   const handle = spoolHandle(spool);
 
   return {
@@ -573,6 +646,7 @@ const externalFrom = (current: State): ExternalProviderTelemetry => {
     shutdownLogs: async () => {
       shuttingDown ??= (async () => {
         cancelSilenceWatch();
+        tokenManager?.shutdown();
         await neverRejects('shutting down logs', () => loggerProvider.shutdown());
       })();
       await shuttingDown;

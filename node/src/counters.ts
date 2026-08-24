@@ -45,6 +45,16 @@ export interface Counters {
   processorErrors: number;
   /** `resultCallback` invoked more than once by an inner exporter. */
   duplicateCallbacks: number;
+  /**
+   * Enrollment-token exchanges attempted — the first one, every scheduled
+   * refresh, and every retry after a 401. A number that climbs faster than one
+   * per token lifetime is the shape of a refresh loop.
+   */
+  tokenExchanges: number;
+  /** Exchanges that produced no token: a non-200, an unusable body, a timeout. */
+  tokenExchangeFailures: number;
+  /** Exports re-sent once with a fresh token after ingest answered 401. */
+  authRetries: number;
 }
 
 const zero = (): Counters => ({
@@ -55,6 +65,9 @@ const zero = (): Counters => ({
   queueDropped: 0,
   processorErrors: 0,
   duplicateCallbacks: 0,
+  tokenExchanges: 0,
+  tokenExchangeFailures: 0,
+  authRetries: 0,
 });
 
 let counters = zero();
