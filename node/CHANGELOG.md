@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0-beta.2](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0-beta.1...node-v0.2.0-beta.2) (2026-08-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **node:** the top-level `apiKey` option and the `auth: 'apiKey'` string are removed. `init({ apiKey })` becomes `init({ auth: { kind: 'apiKey', apiKey } })`.
+
+### Features
+
+* **node:** batch spans and log records ([f1d7602](https://github.com/OcticHQ/telemetry/commit/f1d7602145e67c9636304691a336b05eee06a310))
+* **node:** refresh the ingest token before it expires ([#25](https://github.com/OcticHQ/telemetry/issues/25)) ([2734cfd](https://github.com/OcticHQ/telemetry/commit/2734cfd2c5e9869cf0fc8c9950a4ad2118cfdace))
+
 ## [0.2.0-beta.1](https://github.com/OcticHQ/telemetry/compare/node-v0.1.0-beta.0...node-v0.2.0-beta.1) (2026-08-23)
 
 
