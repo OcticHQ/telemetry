@@ -58,9 +58,13 @@ whole migration is tracked in `migration_progress.md`.
       `identity.ts`, `processor.ts`, `redacting-exporter.ts`,
       `redacting-log-processor.ts`. It is one entry today because those files
       do not exist yet.
-- [ ] **Carry the loader-hook fix** — the PoC's `init.ts` still calls the
-      deprecated `module.register` (Node DEP0205); `svc-raw/telemetry.ts` has
-      the working `module.registerHooks` replacement.
+- [x] **Carry the loader-hook fix** — done in the public-surface pull request,
+      as `node/src/loader-hook.ts`. Written rather than carried: the
+      `svc-raw/telemetry.ts` this line pointed at is in the PoC repository and
+      has never existed in this one, so nothing was there to copy. It also
+      promoted `import-in-the-middle` to a declared dependency, because the
+      synchronous registration has to come from that package directly and must
+      resolve to the same copy `@opentelemetry/instrumentation` hooks through.
 - [ ] Delete the pre-release banners from both READMEs. (The scaffold notice
       in `node/src/index.ts` went with the move.)
 - [ ] Add `node/examples/` — a runnable service per instrumentation stack, of
@@ -85,13 +89,22 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
       handle rather than throwing. Done in the non-interference pull request.
       The bounded queue and drop-on-overflow half belongs to the batching one —
       `SimpleSpanProcessor` has no queue to bound.
-- [ ] **Flip the content default from `full` to `none`.** Deliberately opt-out
-      while nothing real is connected, and it stops being defensible the moment
-      a tenant is onboarded. One line in `content.ts`, a doc pass, and a test
-      pins it either way.
-- [ ] **Decide the OTLP protocol story.** Every PoC stack exports JSON because
-      of how the exporter is constructed; a stock exporter sends protobuf by
-      default. Pin ours to `http/json` explicitly rather than by accident.
+- [ ] **Revisit the content default when the first tenant is onboarded.** It
+      stays `full` — decided in the public-surface pull request, reversing this
+      line, which used to say flip it to `none` now. Opt-out is deliberate while
+      nothing real is connected: a first integration whose traces show no
+      prompts and no outputs cannot be told apart from a broken pipeline. What
+      makes it defensible is that it is documented rather than discovered, so
+      the pairing to watch is `capture: 'full'` plus a spool directory — that
+      writes prompts to the host's disk at rest. `docs/content-policy.md` and
+      the README quick start both say so; a test pins the default either way.
+- [x] **Decide the OTLP protocol story.** JSON, and it stays implied by which
+      exporter package is imported, because neither exporter takes a `protocol`
+      option to say it twice. What the public-surface pull request added is the
+      two things that were missing: a comment at the import naming protobuf as
+      the stock default a reader will expect, and an assertion on the received
+      `content-type` in `init.integration.test.ts`, so swapping the dependency
+      fails a test instead of quietly changing the wire.
 
 ## Found during the non-interference work
 

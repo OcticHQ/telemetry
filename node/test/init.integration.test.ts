@@ -28,6 +28,7 @@ import { withContent } from '../src/content.ts';
 import { withIdentity } from '../src/identity.ts';
 import { withWorkflow } from '../src/annotations.ts';
 import { fakeCollector, FOREIGN_SCOPE, installContextManager } from './support/harness.ts';
+import { SDK_NAME, SDK_VERSION } from '../src/version.ts';
 
 installContextManager();
 
@@ -97,6 +98,19 @@ describe('what init() puts on the wire', () => {
     assert.equal(collector.logs[0]!.url, '/v1/logs');
   });
 
+  /**
+   * The wire encoding, asserted rather than assumed. Nothing in `init.ts` names
+   * JSON — it follows from importing `@opentelemetry/exporter-*-otlp-http`
+   * instead of `-otlp-proto-http`, so swapping a dependency would change what
+   * this SDK puts on the wire with no code change at all. `docs/wire-format.md`
+   * promises JSON and the spool manifest records `application/json` for a
+   * reader to POST with; this is what stops those from becoming untrue.
+   */
+  it('sends OTLP/JSON on both signals, not the stock protobuf', () => {
+    assert.match(String(collector.traces[0]!.headers['content-type']), /application\/json/);
+    assert.match(String(collector.logs[0]!.headers['content-type']), /application\/json/);
+  });
+
   it('presents the api key as a bearer token on both signals', () => {
     assert.equal(collector.traces[0]!.headers.authorization, 'Bearer poc-token');
     assert.equal(collector.logs[0]!.headers.authorization, 'Bearer poc-token');
@@ -106,8 +120,10 @@ describe('what init() puts on the wire', () => {
     const resource = collector.resourceAttributes();
     assert.equal(resource['service.name'], 'init-integration');
     assert.equal(resource['service.version'], '1.4.0');
-    assert.equal(resource['octic.sdk.name'], 'octic-node');
-    assert.equal(resource['octic.sdk.version'], '0.0.0');
+    assert.equal(resource['octic.sdk.name'], SDK_NAME);
+    /** The package's real version — see the note in the external-provider suite. */
+    assert.equal(resource['octic.sdk.version'], SDK_VERSION);
+    assert.notEqual(SDK_VERSION, '0.0.0');
     /** Declared `type: string` in the contract, so it ships as one. */
     assert.equal(resource['octic.schema.version'], '1');
     assert.equal(resource['deployment.environment.name'], 'test');
@@ -235,8 +251,8 @@ describe('the once-per-process guard', () => {
     });
 
     assert.equal(logs.getLoggerProvider(), firstLoggerProvider);
-    assert.ok(external.identityProcessor);
-    assert.ok(external.traceExporter);
+    assert.ok(external.spanProcessor);
+    assert.ok(external.spanExporter);
   });
 });
 

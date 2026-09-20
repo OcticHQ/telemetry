@@ -73,15 +73,15 @@ describe('an init() that fails inside setup', () => {
 
     /** A host SDK will call both of these, so neither may throw. */
     assert.doesNotThrow(() => {
-      external.identityProcessor.onStart({} as Span, ROOT_CONTEXT);
+      external.spanProcessor.onStart({} as Span, ROOT_CONTEXT);
     });
 
     const result = await new Promise<ExportResult>(resolve => {
-      external.traceExporter.export([fakeReadableSpan()], resolve);
+      external.spanExporter.export([fakeReadableSpan()], resolve);
     });
     assert.equal(result.code, ExportResultCode.FAILED, 'and it says so rather than pretending');
 
-    await external.flushLogs();
-    await external.shutdownLogs();
+    await external.forceFlush();
+    await external.shutdown();
   });
 });

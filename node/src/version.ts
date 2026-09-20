@@ -1,3 +1,5 @@
+import { OCTIC_SDK_NAME_VALUE_OCTIC_NODE } from './attributes.ts';
+
 /**
  * The package version, as a value the SDK can put on the wire.
  *
@@ -16,5 +18,14 @@
  */
 export const SDK_VERSION = '0.2.0-beta.2'; // x-release-please-version
 
-/** The name reported alongside the version, as `octic.sdk.name`. */
-export const SDK_NAME = 'octic-node';
+/**
+ * The name reported alongside the version, as `octic.sdk.name`, and the
+ * OpenTelemetry instrumentation scope this SDK's own spans are created under.
+ *
+ * It comes from the contract rather than from a literal here because it is not
+ * ours alone: the Python SDK uses the sibling member for the same two purposes,
+ * and `redacting-exporter.ts` decides a span is foreign by comparing its scope
+ * against the whole set. Three copies of one name in two languages is how the
+ * comparison starts failing open.
+ */
+export const SDK_NAME = OCTIC_SDK_NAME_VALUE_OCTIC_NODE;

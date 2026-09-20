@@ -52,26 +52,59 @@ export {
   withWorkflow,
   withTool,
   withRetrieval,
+  TRACER_NAME,
   type EntityOptions,
   type WorkflowOptions,
   type Target,
 } from './annotations.ts';
+export { OcticSpanProcessor } from './processor.ts';
+// Re-exported *because* it is deprecated: the alias is the migration path, and
+// a consumer only sees the deprecation notice if the old name still resolves.
+// eslint-disable-next-line @typescript-eslint/no-deprecated
 export { IdentitySpanProcessor } from './processor.ts';
 export { RedactingSpanExporter } from './redacting-exporter.ts';
 export { RedactingLogRecordProcessor } from './redacting-log-processor.ts';
 export { SpoolingLogRecordExporter, SpoolingSpanExporter } from './spool-exporter.ts';
+/**
+ * The spool's shape, not its machinery. `Spool` itself, `resolveSpoolOptions`,
+ * `SpoolConfig` and `SpoolManifest` stay internal: a process that reads a spool
+ * directory is a separate program implementing ../../contract/SPOOL.md, and
+ * what it needs is that document. Exporting the class instead invites a reader
+ * built against our internals, which then breaks on a refactor that broke no
+ * contract.
+ */
 export {
-  Spool,
-  resolveSpoolOptions,
   SEGMENT_SUFFIX,
   SPOOL_FORMAT_VERSION,
-  type SpoolConfig,
-  type SpoolManifest,
   type SpoolMode,
   type SpoolOptions,
   type SpoolOverflow,
   type SpoolSignal,
   type SpoolStats,
 } from './spool.ts';
-export * from './attributes.ts';
+export { ATTR } from './attributes.ts';
+export {
+  CUSTOMER_ATTRIBUTE_PREFIX,
+  GEN_AI_OPERATION_NAME_VALUE_EXECUTE_TOOL,
+  GEN_AI_OPERATION_NAME_VALUE_INVOKE_WORKFLOW,
+  GEN_AI_OPERATION_NAME_VALUE_RETRIEVAL,
+  GEN_AI_OPERATION_NAME_VALUES,
+  GEN_AI_TOOL_TYPE_VALUE_DATASTORE,
+  GEN_AI_TOOL_TYPE_VALUE_EXTENSION,
+  GEN_AI_TOOL_TYPE_VALUE_FUNCTION,
+  GEN_AI_TOOL_TYPE_VALUES,
+  OCTIC_CONTENT_CAPTURE_VALUE_FULL,
+  OCTIC_CONTENT_CAPTURE_VALUE_METADATA,
+  OCTIC_CONTENT_CAPTURE_VALUE_NONE,
+  OCTIC_CONTENT_CAPTURE_VALUES,
+  OCTIC_SCHEMA_VERSION,
+  OCTIC_SDK_NAME_VALUE_OCTIC_NODE,
+  OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON,
+  OCTIC_SDK_NAME_VALUES,
+  OCTIC_TARGET_TYPE_VALUE_DATASTORE,
+  OCTIC_TARGET_TYPE_VALUE_SERVICE,
+  OCTIC_TARGET_TYPE_VALUE_TOOL,
+  OCTIC_TARGET_TYPE_VALUES,
+  RESERVED_ATTRIBUTE_PREFIX,
+} from './attributes.ts';
 export { SDK_NAME, SDK_VERSION } from './version.ts';

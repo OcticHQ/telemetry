@@ -10,16 +10,19 @@
  * The second reason is the decisive one. Under `initWithExternalProvider()` the
  * host SDK owns the provider and the processor list is theirs to arrange; the
  * exporter is the one surface that is still ours in *both* entry modes. One
- * implementation covers both. `IdentitySpanProcessor` stays enrichment-only.
+ * implementation covers both. `OcticSpanProcessor` stays enrichment-only.
  */
 import type { ExportResult } from '@opentelemetry/core';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import type { Resource } from '@opentelemetry/resources';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
 import { diag, type Attributes } from '@opentelemetry/api';
-import { TRACER_NAME } from './annotations.ts';
 import { count } from './counters.ts';
-import { ATTR_OCTIC_CONTENT_CAPTURE, ATTR_OCTIC_REDACTED } from './attributes.ts';
+import {
+  ATTR_OCTIC_CONTENT_CAPTURE,
+  ATTR_OCTIC_REDACTED,
+  OCTIC_SDK_NAME_VALUES,
+} from './attributes.ts';
 import {
   applyCapture,
   isContent,
@@ -36,6 +39,22 @@ import {
  * is what that value is.
  */
 const STATUS_MESSAGE_KEY = 'status.message';
+
+/**
+ * The instrumentation scopes that are ours, so everything else is foreign.
+ *
+ * Foreign is the interesting half: a span we did not create can carry an entire
+ * conversation in a bare string under a key nobody has named, so the content
+ * heuristic runs on those and not on ours. Getting the test wrong in the
+ * permissive direction is therefore a leak, which is why the vocabulary is the
+ * contract's `octic.sdk.name` enum rather than a literal — one SDK renaming
+ * itself cannot silently exempt another's spans.
+ *
+ * Every member, not just this SDK's own, because the rule is "did one of our
+ * SDKs make this", and that sentence should read the same in every language
+ * that implements it.
+ */
+const OUR_SCOPES: ReadonlySet<string> = new Set(OCTIC_SDK_NAME_VALUES);
 
 /**
  * Which capture level applies to this span, in order of how much we trust it.
@@ -205,7 +224,7 @@ export class RedactingSpanExporter implements SpanExporter {
   }
 
   private sanitize(span: ReadableSpan): ReadableSpan {
-    const foreign = span.instrumentationScope.name !== TRACER_NAME;
+    const foreign = !OUR_SCOPES.has(span.instrumentationScope.name);
     const capture = resolveCapture(span, this.policy);
 
     const { attributes, redacted: attributesRedacted } = this.sanitizeAttributes(

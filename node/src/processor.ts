@@ -43,7 +43,7 @@ type AttributeSource = Pick<ContextScope<unknown>, 'attributesFrom'>;
  */
 const SCOPES: AttributeSource[] = [identityScope, agentScope, runScope, promptScope];
 
-export class IdentitySpanProcessor implements SpanProcessor {
+export class OcticSpanProcessor implements SpanProcessor {
   /**
    * Attributes that would normally live on the resource, applied per span
    * instead.
@@ -125,3 +125,11 @@ export class IdentitySpanProcessor implements SpanProcessor {
   async forceFlush(): Promise<void> {}
   /* eslint-enable @typescript-eslint/no-empty-function */
 }
+
+/**
+ * The name this class had when identity was the only scope it stamped. It now
+ * stamps agent, run and prompt as well, and resolves the content policy.
+ *
+ * @deprecated Use `OcticSpanProcessor`. Removed before `1.0.0`.
+ */
+export const IdentitySpanProcessor = OcticSpanProcessor;
