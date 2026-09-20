@@ -54,6 +54,13 @@ line-length = 100
 target-version = "py310"
 src = ["src", "tests"]
 
+[tool.ruff.format]
+# The generated contract is `contract/generate.ts`'s output, byte for byte. A
+# formatter that rewrites it makes the artifact stale against its generator,
+# which is a CI failure and, worse, a diff nobody meant to author. Generated
+# artifacts are committed and only the generator writes them (AGENTS.md rule 3).
+exclude = ["src/octic_telemetry/attributes_gen.py"]
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "RUF", "BLE", "SIM", "TID"]
 # BLE001 is switched off per-line where it belongs, with a reason. The rule is
