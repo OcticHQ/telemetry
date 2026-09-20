@@ -12,3 +12,10 @@ coverage/
 *.swp
 
 __pycache__
+
+# Python
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
