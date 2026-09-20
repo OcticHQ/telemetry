@@ -1052,6 +1052,13 @@ const LANGUAGES: LanguageTarget[] = [
       'node/src/self-metrics.ts',
       'node/src/spool.ts',
       'node/src/spool-exporter.ts',
+      // Holds the SDK's own `octic.sdk.name`, which is also the instrumentation
+      // scope its spans carry. Note the check cannot actually catch a restated
+      // copy here — `owned` covers keys, not enum values, and enum values
+      // include `'none'`/`'full'`, which are ordinary union members elsewhere.
+      // `node/test/contract.test.ts` pins it instead. Listed anyway, because
+      // this is also the record of which files reason about the contract.
+      'node/src/version.ts',
     ],
   },
   {

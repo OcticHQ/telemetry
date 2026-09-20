@@ -1,6 +1,6 @@
 # The spool format, version 1
 
-`spoolFormatVersion: 1` · produced by `octic-telemetry/src/spool.ts`
+`spoolFormatVersion: 1` · produced by `node/src/spool.ts`
 
 When the SDK cannot deliver — no credential, a token exchange that is failing,
 ingest refusing connections or answering 5xx after the exporter's own retries —
