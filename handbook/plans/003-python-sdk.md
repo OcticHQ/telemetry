@@ -251,3 +251,30 @@ settled contract.
 HTTP export, enrollment tokens and refresh; the logs signal — the spool format
 already names `logs` segments, so the seam stays; instrumentation of any kind,
 per AGENTS.md rule 8; a `diagnose()` API; Go.
+
+## Amendments
+
+### A1 — what PR A settled that the plan left open (after PR A landed)
+
+**The annotation surface is one object with four call forms.** Each of
+`with_workflow`, `with_tool` and `with_retrieval` returns something usable as
+`with`, as `async with`, and as a decorator over a sync or an async function.
+The block forms set the output explicitly on the handle they yield, because a
+block has no return value to read; the decorator forms take it from what the
+function returned. The plan said "sync and async" without saying which shape,
+and a callback-taking port of the Node signature reads as an un-Pythonic closure
+at every call site.
+
+Attributes are built when the annotation is *entered*, not when it is
+constructed. A decorator is constructed at import time, and serializing its
+input then would record content under whatever capture level happened to be in
+force before the application configured one.
+
+**`counters.py` moved from PR B to PR A.** `sanitize.py` counts what it drops,
+so the counter had to exist alongside it. Only the three counters PR A can move
+are defined; the rest arrive with the pipeline that produces them.
+
+**Context scopes are `ContextScope` plus `ScopeBinding`.** A scope is the typed
+value and its mapping to attributes; binding one returns a fresh object that
+implements both context-manager protocols. The token stack lives on the binding,
+which is what makes nesting a scope inside itself safe.
