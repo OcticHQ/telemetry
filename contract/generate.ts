@@ -970,7 +970,32 @@ const emitMarkdown = (contract: Contract): string => {
  * apostrophe in one of those comments ("the AI SDK's second vocabulary")
  * otherwise opens a string literal and swallows whatever follows — a check that
  * mis-parses is worse than none, because it reports confidently.
+ *
+ * Stripping is per dialect, because the same apostrophe problem arrives in
+ * Python through `#` comments and docstrings, and a JavaScript-shaped stripper
+ * reading a `.py` file is exactly the confident mis-parse this guards against.
+ * Neither dialect's stripper understands a comment marker *inside* a string
+ * literal; both would rather cut too much than too little, since the failure
+ * that matters is a restated key hiding from the check.
  */
+const stripComments = (source: string, path: string): string =>
+  path.endsWith('.py')
+    ? source
+        // Docstrings before `#`, or a hash inside one truncates the line that
+        // was going to close it.
+        .replace(/"""[\s\S]*?"""/g, '')
+        .replace(/'''[\s\S]*?'''/g, '')
+        .replace(/#[^\n]*/g, '')
+    : source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+
+/** Python writes both quote styles; the TypeScript sources are prettier'd to one. */
+const literalsIn = (stripped: string, path: string): string[] =>
+  path.endsWith('.py')
+    ? [...stripped.matchAll(/'([^'\n]*)'|"([^"\n]*)"/g)].map(
+        match => (match[1] ?? match[2]) as string,
+      )
+    : [...stripped.matchAll(/'([^'\n]*)'/g)].map(match => match[1] as string);
+
 const restatedKeys = (contract: Contract): string[] => {
   const owned = new Set([
     ...attributesOf(contract).map(attribute => attribute.id),
@@ -988,12 +1013,9 @@ const restatedKeys = (contract: Contract): string[] => {
       problems.push(`${relative(ROOT, path)}: listed as hand-written but not readable`);
       continue;
     }
-    const stripped = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-    const found = new Set(
-      [...stripped.matchAll(/'([^'\n]*)'/g)]
-        .map(match => match[1] as string)
-        .filter(literal => owned.has(literal)),
-    );
+    const relativePath = relative(ROOT, path);
+    const stripped = stripComments(source, relativePath);
+    const found = new Set(literalsIn(stripped, relativePath).filter(literal => owned.has(literal)));
     for (const literal of [...found].sort()) {
       problems.push(`${relative(ROOT, path)}: restates ${quote(literal)} — import it instead`);
     }
@@ -1065,11 +1087,30 @@ const LANGUAGES: LanguageTarget[] = [
     language: 'python',
     out: 'python/src/octic_telemetry/attributes_gen.py',
     emit: contract => emitPython(contract),
-    // Empty until the Python SDK has a hand-written source that reasons about a
-    // key. The first file added here also needs `restatedKeys` taught about `#`
-    // and docstrings — its comment stripper is JavaScript-shaped, and a drift
-    // check that mis-parses reports confidently about the wrong thing.
-    handWritten: [],
+    // Same rule as the Node list: every hand-written source that reasons about
+    // an attribute key belongs here. `restatedKeys` strips `#` comments and
+    // docstrings for these, which is what the Python entries needed before the
+    // first one could be listed.
+    handWritten: [
+      'python/src/octic_telemetry/__init__.py',
+      'python/src/octic_telemetry/agent.py',
+      'python/src/octic_telemetry/annotations.py',
+      'python/src/octic_telemetry/attributes.py',
+      'python/src/octic_telemetry/content.py',
+      'python/src/octic_telemetry/identity.py',
+      'python/src/octic_telemetry/otlp_json.py',
+      'python/src/octic_telemetry/processor.py',
+      'python/src/octic_telemetry/prompt.py',
+      'python/src/octic_telemetry/redacting_exporter.py',
+      'python/src/octic_telemetry/run.py',
+      'python/src/octic_telemetry/sanitize.py',
+      // Holds this SDK's own `octic.sdk.name`, which is also the instrumentation
+      // scope its spans carry. As with the Node counterpart the check cannot
+      // catch a restated copy here — `owned` covers keys, not enum values — so
+      // `tests/test_contract.py` pins it and this entry is the record that the
+      // file reasons about the contract.
+      'python/src/octic_telemetry/version.py',
+    ],
   },
 ];
 
