@@ -1,0 +1,84 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "octic-telemetry"
+# Owned by release-please once `python` is registered as a component. Until
+# then this is deliberately 0.0.0: an unreleased build should not claim a
+# version number that identifies a release it is not.
+version = "0.0.0"
+description = "Agent telemetry for Octic — OpenTelemetry spans, stamped with the Octic attribute contract"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Octic" }]
+keywords = ["opentelemetry", "telemetry", "observability", "llm", "agents", "genai"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Monitoring",
+  "Typing :: Typed",
+]
+
+# The whole runtime dependency set. Anything else a consumer needs — an
+# instrumentation package, an exporter, a web framework — is theirs to choose;
+# see AGENTS.md rule 8 on why this package ships no instrumentation.
+dependencies = [
+  "opentelemetry-api>=1.30.0,<2.0.0",
+  "opentelemetry-sdk>=1.30.0,<2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/octichq/octic-telemetry"
+Repository = "https://github.com/octichq/octic-telemetry"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "ruff>=0.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/octic_telemetry"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "RUF", "BLE", "SIM", "TID"]
+# BLE001 is switched off per-line where it belongs, with a reason. The rule is
+# on because a bare `except Exception` is nearly always wrong; this package is
+# the narrow case where it is the requirement, so each one is argued at the site.
+
+[tool.ruff.lint.per-file-ignores]
+# The generated contract is the contract's to format, not ruff's.
+"src/octic_telemetry/attributes_gen.py" = ["E501", "RUF001", "RUF002", "RUF003"]
+# Nested `with` is what several of these tests are about — an inner scope
+# composing with an outer one. Flattening them would hide the subject.
+"tests/**" = ["SIM117"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_unreachable = true
+files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+# The generated file is emitted by contract/generate.ts and checked by the
+# drift check, not by us.
+module = "octic_telemetry.attributes_gen"
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
