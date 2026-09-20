@@ -93,10 +93,21 @@ groups:
         requirement: required
         class: metadata
         owner: octic
-        examples: ['octic-node', 'octic-python']
+        enum:
+          - value: octic-node
+            brief: The Node SDK, `@octichq/telemetry`.
+          - value: octic-python
+            brief: The Python SDK, `octic-telemetry`.
         brief: >-
           Which of our SDKs produced this. `telemetry.sdk.*` is reserved for the
           OpenTelemetry SDK itself and would be a lie here.
+        note: >-
+          Closed, and the same value each SDK uses as its OpenTelemetry
+          instrumentation scope name, so a span's scope and its resource agree
+          on who wrote it. That is also what an SDK compares a span's scope
+          against to decide the span is foreign — one that came from
+          instrumentation rather than from our own annotations — which is why
+          the list lives here and is not restated per language.
 
       - id: octic.sdk.version
         type: string

@@ -43,9 +43,26 @@ export const ATTR_OCTIC_SCHEMA_VERSION = 'octic.schema.version';
 
 /**
  * Which of our SDKs produced this. `telemetry.sdk.*` is reserved for the
- * OpenTelemetry SDK itself and would be a lie here.
+ * OpenTelemetry SDK itself and would be a lie here. Closed, and the same value
+ * each SDK uses as its OpenTelemetry instrumentation scope name, so a span's
+ * scope and its resource agree on who wrote it. That is also what an SDK
+ * compares a span's scope against to decide the span is foreign — one that
+ * came from instrumentation rather than from our own annotations — which is
+ * why the list lives here and is not restated per language.
  */
 export const ATTR_OCTIC_SDK_NAME = 'octic.sdk.name';
+
+/** The Node SDK, `@octichq/telemetry`. */
+export const OCTIC_SDK_NAME_VALUE_OCTIC_NODE = 'octic-node';
+
+/** The Python SDK, `octic-telemetry`. */
+export const OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON = 'octic-python';
+
+/** Permitted values for `octic.sdk.name`. */
+export const OCTIC_SDK_NAME_VALUES = [
+  'octic-node', // The Node SDK, `@octichq/telemetry`.
+  'octic-python', // The Python SDK, `octic-telemetry`.
+] as const;
 
 /** Version of the Octic SDK. */
 export const ATTR_OCTIC_SDK_VERSION = 'octic.sdk.version';

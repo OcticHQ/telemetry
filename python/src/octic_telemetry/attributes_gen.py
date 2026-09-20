@@ -46,8 +46,25 @@ a missing attribute from an older SDK.
 ATTR_OCTIC_SDK_NAME = "octic.sdk.name"
 """
 Which of our SDKs produced this. `telemetry.sdk.*` is reserved for the
-OpenTelemetry SDK itself and would be a lie here.
+OpenTelemetry SDK itself and would be a lie here. Closed, and the same value
+each SDK uses as its OpenTelemetry instrumentation scope name, so a span's
+scope and its resource agree on who wrote it. That is also what an SDK
+compares a span's scope against to decide the span is foreign — one that
+came from instrumentation rather than from our own annotations — which is
+why the list lives here and is not restated per language.
 """
+
+OCTIC_SDK_NAME_VALUE_OCTIC_NODE = "octic-node"
+"""The Node SDK, `@octichq/telemetry`."""
+
+OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON = "octic-python"
+"""The Python SDK, `octic-telemetry`."""
+
+OCTIC_SDK_NAME_VALUES: tuple[str, ...] = (
+    "octic-node",  # The Node SDK, `@octichq/telemetry`.
+    "octic-python",  # The Python SDK, `octic-telemetry`.
+)
+"""Permitted values for `octic.sdk.name`."""
 
 ATTR_OCTIC_SDK_VERSION = "octic.sdk.version"
 """Version of the Octic SDK."""

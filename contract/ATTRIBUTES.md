@@ -53,7 +53,8 @@ Identifies the SDK, the deployment and the agent. Normally resource attributes. 
 
 - **`octic.schema.version`** — Which version of this contract the payload was written against. The escape hatch that makes every later change safe: without it a consumer cannot tell a missing attribute from an older SDK.
 - **`octic.sdk.name`** — Which of our SDKs produced this. `telemetry.sdk.*` is reserved for the OpenTelemetry SDK itself and would be a lie here.
-  - Examples: `octic-node`, `octic-python`
+  - Values: `octic-node` (The Node SDK, `@octichq/telemetry`.), `octic-python` (The Python SDK, `octic-telemetry`.)
+  - Closed, and the same value each SDK uses as its OpenTelemetry instrumentation scope name, so a span's scope and its resource agree on who wrote it. That is also what an SDK compares a span's scope against to decide the span is foreign — one that came from instrumentation rather than from our own annotations — which is why the list lives here and is not restated per language.
 - **`octic.sdk.version`** — Version of the Octic SDK.
 - **`service.name`** — Set by the OpenTelemetry SDK from `init()`. Listed so a port knows it is not optional.
 - **`service.version`** — Version of the instrumented application.
