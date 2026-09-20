@@ -35,7 +35,7 @@ import { withTool } from '../src/annotations.ts';
 import { resolvePolicy, setActivePolicy } from '../src/content.ts';
 import { resetCounters, snapshot } from '../src/counters.ts';
 import { withIdentity } from '../src/identity.ts';
-import { IdentitySpanProcessor } from '../src/processor.ts';
+import { OcticSpanProcessor } from '../src/processor.ts';
 import { RedactingSpanExporter } from '../src/redacting-exporter.ts';
 import { SafeSpanExporter } from '../src/safe-exporter.ts';
 import { SafeSpanProcessor } from '../src/safe-processor.ts';
@@ -70,7 +70,7 @@ const guardedProvider = () => {
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'test' }),
     spanProcessors: [
-      new SafeSpanProcessor(new IdentitySpanProcessor()),
+      new SafeSpanProcessor(new OcticSpanProcessor()),
       new SimpleSpanProcessor(
         new SafeSpanExporter(
           new RedactingSpanExporter(collector, resolvePolicy({ capture: 'none' })),
@@ -144,7 +144,7 @@ describe('a Context the enricher cannot read', () => {
   } as unknown as Context;
 
   it('is suppressed rather than thrown into startSpan', () => {
-    const processor = new SafeSpanProcessor(new IdentitySpanProcessor());
+    const processor = new SafeSpanProcessor(new OcticSpanProcessor());
     const span = { setAttributes: () => span, setAttribute: () => span } as unknown as Span;
 
     assert.doesNotThrow(() => {
@@ -265,7 +265,7 @@ describe('the boundary is origin, not stack frame', () => {
    * the contract there, and hiding it would make their bug invisible.
    */
   it('does not catch a foreign processor throwing in the same provider', () => {
-    const wrapped = new SafeSpanProcessor(new IdentitySpanProcessor());
+    const wrapped = new SafeSpanProcessor(new OcticSpanProcessor());
     const foreign: SpanProcessor = {
       onStart: () => {
         throw new Error('the host SDK exploded');

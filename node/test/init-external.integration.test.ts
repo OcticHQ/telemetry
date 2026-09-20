@@ -29,6 +29,7 @@ import { initWithExternalProvider, type ExternalProviderTelemetry } from '../src
 import { withAgent } from '../src/agent.ts';
 import { withIdentity } from '../src/identity.ts';
 import { fakeCollector, FOREIGN_SCOPE, installContextManager } from './support/harness.ts';
+import { SDK_NAME, SDK_VERSION } from '../src/version.ts';
 
 installContextManager();
 
@@ -67,8 +68,8 @@ describe('what it does and does not do on its own', () => {
   });
 
   it('hands back the two pieces the host has to install', () => {
-    assert.ok(telemetry.identityProcessor, 'a processor to enrich');
-    assert.ok(telemetry.traceExporter, 'and an exporter to ship');
+    assert.ok(telemetry.spanProcessor, 'a processor to enrich');
+    assert.ok(telemetry.spanExporter, 'and an exporter to ship');
   });
 
   /**
@@ -102,10 +103,7 @@ describe('once the host has installed them', () => {
         'process.command_args': '/usr/bin/node server.js --token=hunter2',
         'host.id': '84c4f47c43d4497da39ce761dcc11c55',
       }),
-      spanProcessors: [
-        telemetry.identityProcessor,
-        new SimpleSpanProcessor(telemetry.traceExporter),
-      ],
+      spanProcessors: [telemetry.spanProcessor, new SimpleSpanProcessor(telemetry.spanExporter)],
     });
 
     await withIdentity({ conversationId: 'conv-1', userId: 'user-42' }, async () => {
@@ -132,8 +130,14 @@ describe('once the host has installed them', () => {
    */
   it('puts the provenance on every span, because the resource is not ours', () => {
     const span = collector.spans().find(entry => entry.name === 'chat gpt-5');
-    assert.equal(span?.attributes['octic.sdk.name'], 'octic-node');
-    assert.equal(span?.attributes['octic.sdk.version'], '0.0.0');
+    assert.equal(span?.attributes['octic.sdk.name'], SDK_NAME);
+    /**
+     * Against the package's real version, not a literal. It was pinned to
+     * `'0.0.0'` here because `init.ts` shadowed `version.ts` with a local
+     * constant of that value, so the assertion agreed with the bug.
+     */
+    assert.equal(span?.attributes['octic.sdk.version'], SDK_VERSION);
+    assert.notEqual(SDK_VERSION, '0.0.0');
     assert.equal(span?.attributes['octic.schema.version'], '1');
     assert.equal(span?.attributes['deployment.environment.name'], 'test');
   });
@@ -192,10 +196,10 @@ describe('the logs half, which stays ours', () => {
    * logger and vanish.
    */
   it('flushes logs without touching the host provider', async () => {
-    await telemetry.flushLogs();
+    await telemetry.forceFlush();
   });
 
   it('shuts logs down independently', async () => {
-    await telemetry.shutdownLogs();
+    await telemetry.shutdown();
   });
 });

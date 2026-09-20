@@ -22,7 +22,57 @@
  * in semconv's `/incubating` export rather than the stable root, because that
  * part of the spec is still experimental — checking that is what caught
  * `gen_ai.conversation.id` the first time round.
+ *
+ * What leaves the package is narrower than what this file re-exports. `ATTR`
+ * below is the published key surface; the named constants are also published;
+ * the reader-side tables — `CONTENT_KEYS`, `CONTENT_PATTERNS`,
+ * `EMITTED_ATTRIBUTES`, `INTERNAL_ATTRIBUTES`, `RESOURCE_DENY`, `FIELDS` — are
+ * internal here and published separately in `@octichq/contracts`, generated
+ * from this same YAML. A consumer writing telemetry needs the keys; a consumer
+ * reading it needs the tables, and those are two different dependencies.
  */
+import * as gen from './attributes.gen.ts';
+
+/**
+ * Every attribute key the contract owns, as one object rather than 28 top-level
+ * exports.
+ *
+ * `ATTR.OCTIC_RUN_ID` over `ATTR_OCTIC_RUN_ID`: it keeps one name in a
+ * consumer's import list instead of a growing wall of them, and it makes the
+ * set discoverable by typing a dot. The values are the generated constants, so
+ * nothing here restates a key.
+ */
+export const ATTR = Object.freeze({
+  DEPLOYMENT_ENVIRONMENT_NAME: gen.ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  GEN_AI_AGENT_ID: gen.ATTR_GEN_AI_AGENT_ID,
+  GEN_AI_AGENT_NAME: gen.ATTR_GEN_AI_AGENT_NAME,
+  GEN_AI_CONVERSATION_ID: gen.ATTR_GEN_AI_CONVERSATION_ID,
+  GEN_AI_DATA_SOURCE_ID: gen.ATTR_GEN_AI_DATA_SOURCE_ID,
+  GEN_AI_OPERATION_NAME: gen.ATTR_GEN_AI_OPERATION_NAME,
+  GEN_AI_PROMPT_NAME: gen.ATTR_GEN_AI_PROMPT_NAME,
+  GEN_AI_RETRIEVAL_QUERY_TEXT: gen.ATTR_GEN_AI_RETRIEVAL_QUERY_TEXT,
+  GEN_AI_TOOL_NAME: gen.ATTR_GEN_AI_TOOL_NAME,
+  GEN_AI_TOOL_TYPE: gen.ATTR_GEN_AI_TOOL_TYPE,
+  GEN_AI_WORKFLOW_NAME: gen.ATTR_GEN_AI_WORKFLOW_NAME,
+  OCTIC_AGENT_ASSET_REF: gen.ATTR_OCTIC_AGENT_ASSET_REF,
+  OCTIC_CONTENT_CAPTURE: gen.ATTR_OCTIC_CONTENT_CAPTURE,
+  OCTIC_ENTITY_INPUT: gen.ATTR_OCTIC_ENTITY_INPUT,
+  OCTIC_ENTITY_OUTPUT: gen.ATTR_OCTIC_ENTITY_OUTPUT,
+  OCTIC_PROMPT_VERSION: gen.ATTR_OCTIC_PROMPT_VERSION,
+  OCTIC_REDACTED: gen.ATTR_OCTIC_REDACTED,
+  OCTIC_RUN_ID: gen.ATTR_OCTIC_RUN_ID,
+  OCTIC_SCHEMA_VERSION: gen.ATTR_OCTIC_SCHEMA_VERSION,
+  OCTIC_SDK_NAME: gen.ATTR_OCTIC_SDK_NAME,
+  OCTIC_SDK_VERSION: gen.ATTR_OCTIC_SDK_VERSION,
+  OCTIC_TARGET_ASSET_REF: gen.ATTR_OCTIC_TARGET_ASSET_REF,
+  OCTIC_TARGET_NAME: gen.ATTR_OCTIC_TARGET_NAME,
+  OCTIC_TARGET_TYPE: gen.ATTR_OCTIC_TARGET_TYPE,
+  SERVICE_NAME: gen.ATTR_SERVICE_NAME,
+  SERVICE_VERSION: gen.ATTR_SERVICE_VERSION,
+  SESSION_ID: gen.ATTR_SESSION_ID,
+  USER_ID: gen.ATTR_USER_ID,
+});
+
 export {
   ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
   ATTR_GEN_AI_AGENT_ID,
@@ -72,6 +122,9 @@ export {
   OCTIC_CONTENT_CAPTURE_VALUE_NONE,
   OCTIC_CONTENT_CAPTURE_VALUES,
   OCTIC_SCHEMA_VERSION,
+  OCTIC_SDK_NAME_VALUE_OCTIC_NODE,
+  OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON,
+  OCTIC_SDK_NAME_VALUES,
   OCTIC_TARGET_TYPE_VALUE_DATASTORE,
   OCTIC_TARGET_TYPE_VALUE_SERVICE,
   OCTIC_TARGET_TYPE_VALUE_TOOL,

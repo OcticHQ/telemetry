@@ -19,7 +19,7 @@ import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
 import type { ExportResult } from '@opentelemetry/core';
 
-import { IdentitySpanProcessor } from '../src/processor.ts';
+import { OcticSpanProcessor } from '../src/processor.ts';
 import { RedactingSpanExporter } from '../src/redacting-exporter.ts';
 import { RedactingLogRecordProcessor } from '../src/redacting-log-processor.ts';
 import { resolvePolicy, withContent, type ContentOptions } from '../src/content.ts';
@@ -79,7 +79,7 @@ const harness = (content: ContentOptions, extraResource: Record<string, string> 
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'test', ...extraResource }),
     spanProcessors: [
-      new IdentitySpanProcessor(),
+      new OcticSpanProcessor(),
       new SimpleSpanProcessor(new RedactingSpanExporter(collector, resolvePolicy(content))),
     ],
   });

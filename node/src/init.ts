@@ -1,17 +1,29 @@
 /**
  * OTLP wiring, pre-assembled.
  *
- * Ships no instrumentation. The consumer brings their own; the identity
- * processor enriches whatever they bring.
+ * Ships no instrumentation. The consumer brings their own; `OcticSpanProcessor`
+ * enriches whatever they bring.
  *
  *   init()                      creates and registers the global TracerProvider
  *   initWithExternalProvider()  when another SDK owns it — returns the parts to
  *                               hand over, and is not complete until you do
  */
-import { register } from 'node:module';
 import { diag, DiagConsoleLogger, DiagLogLevel } from '@opentelemetry/api';
 import { logs } from '@opentelemetry/api-logs';
 import { ExportResultCode } from '@opentelemetry/core';
+/**
+ * OTLP/JSON, and the package name is the whole of the pin — there is no
+ * `protocol` option on either exporter to say it twice.
+ *
+ * `…-otlp-http` serializes JSON; `…-otlp-proto-http` serializes protobuf, and
+ * protobuf is what a stock OTLP/HTTP exporter sends, so a reader arriving here
+ * from the OpenTelemetry docs will expect the opposite of what this does.
+ * `docs/wire-format.md` states JSON as deliberate and `init.ts` writes
+ * `contentType: 'application/json'` into every spool manifest, which a
+ * downstream reader POSTs the segment with — so a swap of either import is a
+ * silent lie in three places at once. `init.integration.test.ts` asserts the
+ * received content type for that reason.
+ */
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { resourceFromAttributes } from '@opentelemetry/resources';
@@ -45,8 +57,9 @@ import {
   OCTIC_SCHEMA_VERSION,
 } from './attributes.ts';
 import { resolveBatchOptions, type BatchOptions } from './batching.ts';
+import { installLoaderHook } from './loader-hook.ts';
 import { resolvePolicy, setActivePolicy, type ContentOptions } from './content.ts';
-import { IdentitySpanProcessor } from './processor.ts';
+import { OcticSpanProcessor } from './processor.ts';
 import { RedactingLogRecordProcessor } from './redacting-log-processor.ts';
 import { RedactingSpanExporter } from './redacting-exporter.ts';
 import { SafeLogRecordExporter, SafeSpanExporter } from './safe-exporter.ts';
@@ -62,9 +75,7 @@ import {
   type SpoolOptions,
   type SpoolStats,
 } from './spool.ts';
-
-const SDK_NAME = 'octic-node';
-const SDK_VERSION = '0.0.0';
+import { SDK_NAME, SDK_VERSION } from './version.ts';
 
 export interface InitOptions {
   /** Base URL of the collector. `/v1/traces` and `/v1/logs` are appended. */
@@ -118,6 +129,16 @@ export interface InitOptions {
    * calling `shutdown()`.
    */
   batch?: BatchOptions;
+  /**
+   * Whether to install the ESM loader hook. Defaults to true, which is what an
+   * application wants: without it, ESM auto-instrumentation patches nothing.
+   *
+   * Set it false when something else already installed one — a host SDK, a
+   * `--import` shim, or a runtime that arranges its own — because a second
+   * registration is a second loader in the chain rather than a no-op. See
+   * loader-hook.ts.
+   */
+  loaderHook?: boolean;
 }
 
 export interface SpoolHandle {
@@ -140,26 +161,30 @@ export interface ExternalProviderTelemetry {
   /**
    * Hand both to the host SDK: the processor to enrich, the exporter to ship.
    *
-   * Typed as the interface rather than `IdentitySpanProcessor` because what
+   * Typed as the interface rather than `OcticSpanProcessor` because what
    * you get is the enricher inside a guard that stops it throwing into the
    * host SDK's `startSpan`. Pass it along; nothing here is meant to be
    * inspected.
    */
-  identityProcessor: SpanProcessor;
+  spanProcessor: SpanProcessor;
   /** Redaction-wrapped. Handing over the raw OTLP exporter would bypass policy. */
-  traceExporter: SpanExporter;
+  spanExporter: SpanExporter;
   /**
    * For host SDKs with their own content switch — pass it through
    * (`traceloop.initialize({ traceContent: telemetry.captureContent })`) so
    * content is never produced rather than produced and stripped.
    */
   captureContent: boolean;
-  /** Logs only. The spans are in the host SDK's provider — flush those there. */
-  flushLogs: () => Promise<void>;
-  shutdownLogs: () => Promise<void>;
+  /**
+   * Logs only — both of them. The spans are in the host SDK's provider, so
+   * flush and stop those there. The names lost the `Logs` suffix when this
+   * interface was tidied for publication; the scope did not change.
+   */
+  forceFlush: () => Promise<void>;
+  shutdown: () => Promise<void>;
   /**
    * Present only when spooling is enabled. The spool rides inside
-   * `traceExporter`, so it is live in this mode too — but only once the host SDK
+   * `spanExporter`, so it is live in this mode too — but only once the host SDK
    * has actually been handed that exporter.
    */
   spool?: SpoolHandle;
@@ -182,6 +207,7 @@ const setup = (
     content,
     spool,
     batch,
+    loaderHook = true,
   }: InitOptions,
   { provenanceOnSpans }: { provenanceOnSpans: boolean },
 ) => {
@@ -193,19 +219,15 @@ const setup = (
    * ESM auto-instrumentation patches modules as they load, which needs a loader
    * hook; without it a run exits 0 having emitted nothing. Only effective if
    * this runs before the instrumented library is imported, hence
-   * `node --import ./telemetry.ts server.ts`.
+   * `node --import ./telemetry.ts server.ts`. Which of the two hooks gets
+   * installed is `loader-hook.ts`'s business.
    *
    * A library bundling its own nested copy of import-in-the-middle is not
-   * served by this registration and needs its own escape hatch.
+   * served by this registration and needs its own escape hatch. `loaderHook:
+   * false` is the escape hatch for the other direction — a host that has
+   * already installed one.
    */
-  // DEP0205. The replacement is `module.registerHooks` via
-  // `import-in-the-middle/register-hooks.mjs`, gated on `supportsSyncHooks()`
-  // with this as the fallback. Deliberately not changed here: this pull request
-  // moves code and changes no behaviour, and swapping the loader hook changes
-  // when and how foreign modules are patched. It lands with the rest of the
-  // public-surface work.
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  register('@opentelemetry/instrumentation/hook.mjs', import.meta.url);
+  if (loaderHook) installLoaderHook();
 
   const provenance = {
     /**
@@ -305,8 +327,8 @@ const setup = (
    * including the one where the processor is handed to a host SDK and this
    * package never sees it called again.
    */
-  const identityProcessor = new SafeSpanProcessor(
-    new IdentitySpanProcessor(provenanceOnSpans ? provenance : {}),
+  const spanProcessor = new SafeSpanProcessor(
+    new OcticSpanProcessor(provenanceOnSpans ? provenance : {}),
   );
 
   const signalPaths = { traces: '/v1/traces', logs: '/v1/logs' } as const;
@@ -372,7 +394,7 @@ const setup = (
    * properties of the whole chain, and PR4 inserts another link into the
    * middle of it.
    */
-  const traceExporter = new SafeSpanExporter(
+  const spanExporter = new SafeSpanExporter(
     new RedactingSpanExporter(
       spoolInstance === undefined
         ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
@@ -440,8 +462,8 @@ const setup = (
 
   return {
     resource,
-    identityProcessor,
-    traceExporter,
+    spanProcessor,
+    spanExporter,
     loggerProvider,
     contentPolicy,
     batchOptions,
@@ -475,8 +497,11 @@ type Parts = ReturnType<typeof setup>;
  * The replacement never re-runs `setup()`, because `setup()` is not idempotent
  * and its non-idempotence is invisible rather than loud:
  *
- *   - `register('@opentelemetry/instrumentation/hook.mjs')` would add a second
- *     ESM loader hook.
+ *   - `installLoaderHook()` would install a second ESM loader hook on the
+ *     asynchronous path. (The synchronous one notices and warns instead, which
+ *     is luck rather than a guarantee.) This is the one bullet a caller can
+ *     switch off — `loaderHook: false` skips it — and the other four still
+ *     hold, so the latch does not become optional along with it.
  *   - `logs.setGlobalLoggerProvider` *silently ignores* a second registration
  *     and keeps the first, so the second LoggerProvider is dangling and the
  *     handle built around it flushes something no log record reaches.
@@ -526,11 +551,11 @@ const inertExporter: SpanExporter = {
 };
 
 const INERT_EXTERNAL: ExternalProviderTelemetry = {
-  identityProcessor: inertProcessor,
-  traceExporter: inertExporter,
+  spanProcessor: inertProcessor,
+  spanExporter: inertExporter,
   captureContent: false,
-  flushLogs: () => Promise.resolve(),
-  shutdownLogs: () => Promise.resolve(),
+  forceFlush: () => Promise.resolve(),
+  shutdown: () => Promise.resolve(),
 };
 
 /**
@@ -575,7 +600,7 @@ let shuttingDown: Promise<void> | undefined;
 const telemetryFrom = (current: State): Telemetry => {
   if (current.kind === 'failed') return INERT;
 
-  const { loggerProvider, traceExporter, spool, tokenManager } = current.parts;
+  const { loggerProvider, spanExporter, spool, tokenManager } = current.parts;
   const handle = spoolHandle(spool);
 
   /**
@@ -586,11 +611,11 @@ const telemetryFrom = (current: State): Telemetry => {
   const flushTraces =
     current.kind === 'own'
       ? () => current.tracerProvider.forceFlush()
-      : () => traceExporter.forceFlush();
+      : () => spanExporter.forceFlush();
   const shutdownTraces =
     current.kind === 'own'
       ? () => current.tracerProvider.shutdown()
-      : () => traceExporter.shutdown();
+      : () => spanExporter.shutdown();
 
   return {
     /**
@@ -629,21 +654,21 @@ const telemetryFrom = (current: State): Telemetry => {
 const externalFrom = (current: State): ExternalProviderTelemetry => {
   if (current.kind === 'failed') return INERT_EXTERNAL;
 
-  const { identityProcessor, traceExporter, loggerProvider, contentPolicy, spool, tokenManager } =
+  const { spanProcessor, spanExporter, loggerProvider, contentPolicy, spool, tokenManager } =
     current.parts;
   const handle = spoolHandle(spool);
 
   return {
-    identityProcessor,
-    traceExporter,
+    spanProcessor,
+    spanExporter,
     captureContent: contentPolicy.capture !== 'none',
-    flushLogs: () => neverRejects('flushing logs', () => loggerProvider.forceFlush()),
+    forceFlush: () => neverRejects('flushing logs', () => loggerProvider.forceFlush()),
     /**
      * Latched like `Telemetry.shutdown`, and it cancels the silence watch for
      * the same reason: in this mode the host SDK owns the spans, so its own
      * shutdown is the only signal we get that the process is stopping.
      */
-    shutdownLogs: async () => {
+    shutdown: async () => {
       shuttingDown ??= (async () => {
         cancelSilenceWatch();
         tokenManager?.shutdown();
@@ -699,7 +724,7 @@ export const init = (options: InitOptions): Telemetry => {
     const tracerProvider = new NodeTracerProvider({
       resource: parts.resource,
       spanProcessors: [
-        parts.identityProcessor,
+        parts.spanProcessor,
         /**
          * Guarded for the same reason the logs half is: `forceFlush` and
          * `shutdown` on a batch processor reject when a batch fails
@@ -710,7 +735,7 @@ export const init = (options: InitOptions): Telemetry => {
          */
         new SafeSpanProcessor(
           new BatchSpanProcessor({
-            exporter: parts.traceExporter,
+            exporter: parts.spanExporter,
             ...parts.batchOptions,
             selfObsMeterProvider: queueDropMeterProvider(),
           }),
@@ -729,7 +754,7 @@ export const init = (options: InitOptions): Telemetry => {
 };
 
 /**
- * Creates no provider. Until `identityProcessor` and `traceExporter` reach the
+ * Creates no provider. Until `spanProcessor` and `spanExporter` reach the
  * SDK that owns the provider, no span reaches the endpoint.
  */
 export const initWithExternalProvider = (options: InitOptions): ExternalProviderTelemetry => {

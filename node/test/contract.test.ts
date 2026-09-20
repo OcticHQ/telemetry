@@ -32,6 +32,9 @@ import {
 } from '../src/attributes.gen.ts';
 import { isContent, isDeniedResourceAttribute, resolvePolicy } from '../src/content.ts';
 import { identityScope } from '../src/identity.ts';
+import { TRACER_NAME, TRACER_VERSION } from '../src/annotations.ts';
+import { SDK_NAME, SDK_VERSION } from '../src/version.ts';
+import { OCTIC_SDK_NAME_VALUE_OCTIC_NODE, OCTIC_SDK_NAME_VALUES } from '../src/attributes.gen.ts';
 
 /**
  * Every generated constant that claims to be a semantic convention, against the
@@ -259,5 +262,42 @@ describe('the wire surface, round trip', () => {
       [],
       'the contract declares these but no scenario produced them — extend the scenario or drop the entry',
     );
+  });
+});
+
+/**
+ * The instrumentation scope name, which the drift check cannot see.
+ *
+ * `restatedKeys` in `contract/generate.ts` owns attribute *keys* — ids, content
+ * keys, denied keys, field aliases — and deliberately not enum *values*, because
+ * `'none'`, `'metadata'` and `'full'` are legitimate union members all over
+ * `content.ts` and flagging them would bury every real finding. So the one enum
+ * value this package depends on being a single copy is pinned here instead.
+ *
+ * It matters because it is read twice, in two directions: our own spans are
+ * created under it, and `redacting-exporter.ts` decides a span is foreign by not
+ * finding its scope in the set. A hand-written copy that drifts from the
+ * contract stops our spans being recognised as ours — and a foreign span is the
+ * one the content heuristic runs on, so the failure is a leak in the permissive
+ * direction rather than a missing attribute.
+ */
+describe('the instrumentation scope', () => {
+  it('is the SDK name the contract publishes, not a literal of our own', () => {
+    assert.equal(TRACER_NAME, SDK_NAME);
+    assert.equal(SDK_NAME, OCTIC_SDK_NAME_VALUE_OCTIC_NODE);
+    assert.ok(
+      (OCTIC_SDK_NAME_VALUES as readonly string[]).includes(TRACER_NAME),
+      'the scope our spans carry must be a member of octic.sdk.name',
+    );
+  });
+
+  /**
+   * The scope version travels on the wire beside the name. It was `'0.0.0'`
+   * until the public-surface pass, which made every span claim a version that
+   * could not identify a release.
+   */
+  it('carries the package version, not a placeholder', () => {
+    assert.equal(TRACER_VERSION, SDK_VERSION);
+    assert.notEqual(TRACER_VERSION, '0.0.0');
   });
 });

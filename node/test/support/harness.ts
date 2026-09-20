@@ -26,7 +26,7 @@ import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 
 import { TRACER_NAME } from '../../src/annotations.ts';
 import { resolvePolicy, setActivePolicy, type ContentOptions } from '../../src/content.ts';
-import { IdentitySpanProcessor } from '../../src/processor.ts';
+import { OcticSpanProcessor } from '../../src/processor.ts';
 import { RedactingSpanExporter } from '../../src/redacting-exporter.ts';
 
 /**
@@ -157,7 +157,7 @@ export interface HarnessOptions {
   content?: ContentOptions;
   /** Extra resource attributes, for the resource-scrub path. */
   resource?: Record<string, string>;
-  /** What IdentitySpanProcessor stamps per span — the external-provider case. */
+  /** What OcticSpanProcessor stamps per span — the external-provider case. */
   processorDefaults?: Attributes;
   collector?: CollectorOptions;
 }
@@ -181,7 +181,7 @@ export const buildProvider = ({
   const provider = new NodeTracerProvider({
     resource: resourceFromAttributes({ 'service.name': 'test', ...resource }),
     spanProcessors: [
-      new IdentitySpanProcessor(processorDefaults),
+      new OcticSpanProcessor(processorDefaults),
       new SimpleSpanProcessor(new RedactingSpanExporter(collector, policy)),
     ],
   });

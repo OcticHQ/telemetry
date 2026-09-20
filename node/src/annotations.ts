@@ -32,9 +32,20 @@ import {
 } from './attributes.ts';
 import { currentCapture, truncate } from './content.ts';
 import { mintRunId, runScope } from './run.ts';
+import { SDK_NAME, SDK_VERSION } from './version.ts';
 
-export const TRACER_NAME = 'octic-telemetry';
-export const TRACER_VERSION = '0.0.0';
+/**
+ * The instrumentation scope our own annotation spans are created under.
+ *
+ * It is the SDK's name and version, not a third pair: the scope on a span and
+ * the `octic.sdk.*` pair on its resource then cannot disagree about who wrote
+ * it, and the exporter's foreign-span test (`redacting-exporter.ts`) is reading
+ * the same contract-owned vocabulary that produced them. Both were `'0.0.0'`
+ * literals until the public-surface pass, which meant every span this SDK ever
+ * produced claimed a version that could not identify a release.
+ */
+export const TRACER_NAME = SDK_NAME;
+export const TRACER_VERSION = SDK_VERSION;
 
 /**
  * What a span touched: a datastore, another service, an external tool. The

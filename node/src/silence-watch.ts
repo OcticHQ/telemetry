@@ -50,7 +50,7 @@ export const configureSilenceWatch = (millis: number = SILENCE_WARNING_MS): void
 };
 
 /**
- * The arming edge, from `IdentitySpanProcessor.onStart` — the one hook that
+ * The arming edge, from `OcticSpanProcessor.onStart` — the one hook that
  * runs per span in both entry modes, including the one where a host SDK owns
  * the provider and our processors are all it took from us.
  *
