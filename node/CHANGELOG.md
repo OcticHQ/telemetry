@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0-beta.2...node-v0.2.0) (2026-09-21)
+
+
+### Bug Fixes
+
+* **node:** publish to latest as the beta line graduates to 0.2.0 ([23bbfa9](https://github.com/OcticHQ/telemetry/commit/23bbfa9087323f43522301b5805342688093f1e2))
+
 ## [0.2.0-beta.2](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0-beta.1...node-v0.2.0-beta.2) (2026-08-24)
 
 
