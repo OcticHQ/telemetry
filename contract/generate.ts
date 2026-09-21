@@ -1099,6 +1099,7 @@ const LANGUAGES: LanguageTarget[] = [
       'python/src/octic_telemetry/content.py',
       'python/src/octic_telemetry/identity.py',
       'python/src/octic_telemetry/otlp_json.py',
+      'python/src/octic_telemetry/pipeline.py',
       'python/src/octic_telemetry/processor.py',
       'python/src/octic_telemetry/prompt.py',
       'python/src/octic_telemetry/redacting_exporter.py',
