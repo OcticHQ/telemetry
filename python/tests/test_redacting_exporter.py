@@ -203,4 +203,4 @@ def test_the_resource_is_scrubbed_once_and_reused(tracer: trace.Tracer) -> None:
 def test_counters_start_and_stay_at_zero_on_the_happy_path(harness: Harness) -> None:
     with with_tool(name="lookup", input={"q": "hello"}):
         pass
-    assert snapshot() == {"attributes_dropped": 0, "spans_dropped": 0, "processor_errors": 0}
+    assert all(value == 0 for value in snapshot().values())

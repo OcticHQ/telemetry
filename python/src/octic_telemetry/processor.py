@@ -24,6 +24,7 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.util.types import AttributeValue
 
+from . import silence_watch
 from .agent import agent_scope
 from .attributes import ATTR_OCTIC_CONTENT_CAPTURE
 from .content import active_policy, content_scope, record_span_capture
@@ -73,6 +74,10 @@ class OcticSpanProcessor(SpanProcessor):
         self._defaults: dict[str, AttributeValue] = sanitized
 
     def on_start(self, span: Span, parent_context: Context | None = None) -> None:
+        # The arming edge for the silence warning: this is the one hook that runs
+        # per span in both entry modes, including the one where a host SDK owns
+        # the provider and our processors are all it took from us.
+        silence_watch.note_span_started()
         span.set_attributes(self._defaults)
 
         # The scope maps go through the sanitizer first — not because
