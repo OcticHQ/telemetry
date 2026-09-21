@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/OcticHQ/telemetry/compare/contract-v0.2.0-beta.2...contract-v0.2.0) (2026-09-21)
+
+
+### Documentation
+
+* **contract:** graduate to 0.2.0 and name the tags as they are ([4f192cf](https://github.com/OcticHQ/telemetry/commit/4f192cfa31fa221d82a476c8923401af0a61b3dc))
+
 ## [0.2.0-beta.2](https://github.com/OcticHQ/telemetry/compare/contract-v0.2.0-beta.1...contract-v0.2.0-beta.2) (2026-08-23)
 
 
