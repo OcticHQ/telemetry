@@ -28,6 +28,7 @@ from .attributes import (
     OCTIC_TARGET_TYPE_VALUES,
     RESERVED_ATTRIBUTE_PREFIX,
 )
+from .batching import BatchOptions
 from .content import (
     ContentCapture,
     ContentOptions,
@@ -39,10 +40,18 @@ from .content import (
 )
 from .identity import Identity, current_identity, with_identity
 from .otlp_json import encode_spans
+from .pipeline import (
+    ExternalProviderTelemetry,
+    SpoolHandle,
+    Telemetry,
+    init,
+    init_with_external_provider,
+)
 from .processor import OcticSpanProcessor
 from .prompt import Prompt, with_prompt
 from .redacting_exporter import RedactingSpanExporter
 from .run import Run, current_run_id, mint_run_id, with_run
+from .spool import SpoolOptions, SpoolStats
 from .version import SDK_NAME, SDK_VERSION
 
 __all__ = [
@@ -64,21 +73,29 @@ __all__ = [
     "SDK_VERSION",
     "Agent",
     "AnnotationScope",
+    "BatchOptions",
     "ContentCapture",
     "ContentOptions",
     "ContentPolicy",
+    "ExternalProviderTelemetry",
     "Identity",
     "OcticSpanProcessor",
     "Prompt",
     "RedactingSpanExporter",
     "Redactor",
     "Run",
+    "SpoolHandle",
+    "SpoolOptions",
+    "SpoolStats",
     "Target",
+    "Telemetry",
     "agent_attributes",
     "current_capture",
     "current_identity",
     "current_run_id",
     "encode_spans",
+    "init",
+    "init_with_external_provider",
     "mint_run_id",
     "resolve_policy",
     "with_agent",

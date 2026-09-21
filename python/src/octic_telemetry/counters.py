@@ -29,6 +29,12 @@ log = logging.getLogger("octic_telemetry")
 
 @dataclass
 class Counters:
+    #: Spans the pipeline took custody of — in this release, written to the spool.
+    #: Not "exported": nothing leaves over the network, and a counter reading zero
+    #: under a working spool would be read as a broken pipeline.
+    spans_accepted: int = 0
+    #: Batches that ended ``FAILURE``: the spool refused them, or encoding failed.
+    exports_failed: int = 0
     #: Attribute entries the sanitizer refused: wrong type, oversized, over the cap.
     attributes_dropped: int = 0
     #: Spans dropped from a batch because they could not be copied at all.

@@ -9,6 +9,15 @@ individual policy decision.
 
 from __future__ import annotations
 
+# Before the provider below is built, and load-bearing. `TracerProvider` registers
+# an after-fork hook that re-detects the resource on a thread pool, and
+# `concurrent.futures` imports its thread module lazily. Built with an explicit
+# `Resource(...)`, as here, the provider registers its hook *before* the pool's
+# own fork-lock reset is registered; the child then runs OpenTelemetry's hook
+# against a lock still held from before the fork, and hangs. Importing the module
+# first puts the reset ahead of it. Upstream's ordering bug, not ours, and only
+# reachable here because nothing called `Resource.create` first.
+import concurrent.futures.thread  # noqa: F401
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any

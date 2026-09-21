@@ -97,3 +97,24 @@ def test_exporting_an_empty_batch_is_fine(harness: Harness) -> None:
 
     exporter = RedactingSpanExporter(InMemorySpanExporter(), resolve_policy())
     assert exporter.export([]) is SpanExportResult.SUCCESS
+
+
+def test_a_raising_processor_behind_the_guard_cannot_break_a_span() -> None:
+    """What `init()` actually installs: the enricher inside `SafeSpanProcessor`.
+
+    The processor is called from inside `start_span`, inside the customer's own
+    code, so a raise there would be theirs to catch. It never gets that far.
+    """
+    from opentelemetry.sdk.trace import TracerProvider
+
+    from octic_telemetry.safe_processor import SafeSpanProcessor
+
+    class Exploding(OcticSpanProcessor):
+        def on_start(self, span: object, parent_context: object = None) -> None:
+            raise RuntimeError("our bug")
+
+    provider = TracerProvider(shutdown_on_exit=False)
+    provider.add_span_processor(SafeSpanProcessor(Exploding()))
+
+    with provider.get_tracer("customer").start_as_current_span("request") as span:
+        assert span.is_recording()
