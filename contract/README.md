@@ -8,7 +8,7 @@ share a repository.**
 | [`attributes.yaml`](attributes.yaml) | the source of truth — hand-edited |
 | [`generate.ts`](generate.ts) | the emitters, one per language |
 | [`ATTRIBUTES.md`](ATTRIBUTES.md) | **generated** — the published, language-neutral spec |
-| `version.txt` | **generated** — owned by release-please, tagged `contract/vX.Y.Z` |
+| `version.txt` | **generated** — owned by release-please, tagged `contract-vX.Y.Z` |
 | [`CHANGELOG.md`](CHANGELOG.md) | **generated** — owned by release-please |
 
 ```
@@ -39,7 +39,7 @@ commit as the change that caused them. CI only verifies; it never writes.
 - **`schema_version`** inside `attributes.yaml` is the wire-level schema, and it
   appears on every span as `octic.schema.version`. It moves only when a removal
   or a type change breaks a reader.
-- **`version.txt`** is the release version of this document, `contract/vX.Y.Z`,
+- **`version.txt`** is the release version of this document, `contract-vX.Y.Z`,
   so be-ingest and be-worker can cite the contract revision they implement. It
   moves on every releasable change, including additive ones.
 
