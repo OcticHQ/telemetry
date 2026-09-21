@@ -46,6 +46,14 @@ jobs:
     name: Contract
     uses: ./.github/workflows/_contract.yml
 
+  # Runs on main as it does on pull requests, and deliberately does not gate
+  # release-please below: nothing Python is released yet, so a Python failure
+  # holding back a Node release would be the wrong coupling. When `python` is
+  # registered it joins that `needs` list alongside the Node job.
+  python:
+    name: Python
+    uses: ./.github/workflows/_python.yml
+
   node:
     name: Node
     needs: detect

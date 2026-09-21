@@ -47,7 +47,13 @@ jobs:
     name: Contract
     uses: ./.github/workflows/_contract.yml
 
-  # One `if:` per language. That is the entire cost of adding Python here.
+  # Unconditional until `python` is a registered component — see the header
+  # of _python.yml. It then takes an `if:` like the Node job below.
+  python:
+    name: Python
+    uses: ./.github/workflows/_python.yml
+
+  # One `if:` per language.
   node:
     name: Node
     needs: detect
@@ -86,7 +92,7 @@ jobs:
   report:
     name: Report
     runs-on: ubuntu-24.04-arm
-    needs: [detect, contract, node, repo]
+    needs: [detect, contract, python, node, repo]
     if: always()
     permissions:
       pull-requests: write
@@ -98,6 +104,7 @@ jobs:
           DETECT_RESULT: ${{ needs.detect.result }}
           CONTRACT_RESULT: ${{ needs.contract.result }}
           NODE_RESULT: ${{ needs.node.result }}
+          PYTHON_RESULT: ${{ needs.python.result }}
           REPO_RESULT: ${{ needs.repo.result }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -122,6 +129,7 @@ jobs:
             echo "| $(icon "$DETECT_RESULT") | **Detect** | changed-component discovery |"
             echo "| $(icon "$CONTRACT_RESULT") | **Contract** | generated constants current, no restated keys |"
             echo "| $(icon "$NODE_RESULT") | **Node** | lint, format, typecheck, tests, pack |"
+            echo "| $(icon "$PYTHON_RESULT") | **Python** | lint, format, typecheck, tests |"
             echo "| $(icon "$REPO_RESULT") | **Repository** | conventional commits, component registration |"
             echo
             echo "<sub>[Full run](${RUN_URL}) &middot; updated on every push</sub>"
