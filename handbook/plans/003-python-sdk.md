@@ -278,3 +278,39 @@ are defined; the rest arrive with the pipeline that produces them.
 value and its mapping to attributes; binding one returns a fresh object that
 implements both context-manager protocols. The token stack lives on the binding,
 which is what makes nesting a scope inside itself safe.
+
+### A2 — what PR B settled (after PR B landed)
+
+**The run scope stays block-only.** There is no set-and-continue `bind_run`,
+here or in Node: an attach with no matching detach leaks the run id onto
+whatever runs next on that thread or asyncio task. The run id comes from the
+application — `with_run(id)`, or `with_workflow(run_id=...)` — and a framework
+that splits the work across before and after hooks calls the binding's
+`__enter__` and `__exit__` from them. Carrying a run id across a process
+boundary is a separate feature (baggage) and not part of this plan.
+
+**The module is `pipeline.py`, not `init.py`.** The package exports a function
+called `init`, and a submodule of the same name is shadowed by it — `import
+octic_telemetry.init` then resolves to the function.
+
+**External mode hands over a processor, not only an exporter.**
+`init_with_external_provider()` returns `export_processor`, a guarded
+`BatchSpanProcessor` over the exporter chain, beside `span_processor` and the
+bare `span_exporter`. That is how "batch, never simple" survives a host SDK that
+arranges its own processors: the thing we recommend handing over is already
+batched.
+
+**`init()` checks for an existing global provider first.** Python ignores a
+second `set_tracer_provider` with one log line, so `init()` in a process where
+another SDK got there first would otherwise build a pipeline nothing reaches and
+report success. It warns, points at `init_with_external_provider()`, and ends
+`degraded`.
+
+**The spool holds nothing in memory.** Writes are synchronous on the batch
+worker, so there is no pending queue and no drain at exit; what a process loses
+without `shutdown()` is the batch processor's queue. The spool re-mints its
+writer id in a forked child (`os.register_at_fork`), which Node never needed.
+
+**The silence warning is keyed to segments** and armed only once `init()` has
+run, so a process that imports the package and never configures it is not
+warned about spans it never asked to send.
