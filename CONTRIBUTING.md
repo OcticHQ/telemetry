@@ -14,6 +14,7 @@ except where you would otherwise get it wrong.
 | `pre-commit` | runs the hooks below | `pipx install pre-commit` |
 | `jq` | the helper scripts | `brew install jq` / `apt install jq` |
 | Node 24 | the Node SDK and the contract generator | `nvm use` (see `.nvmrc`) |
+| Python 3.10+ | the Python SDK | your platform's build, or `uv python install 3.10` |
 | `make` | the command facade — optional | already installed |
 
 You only need a language's toolchain if you are touching that language. Working

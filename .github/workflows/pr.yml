@@ -47,13 +47,13 @@ jobs:
     name: Contract
     uses: ./.github/workflows/_contract.yml
 
-  # Unconditional until `python` is a registered component — see the header
-  # of _python.yml. It then takes an `if:` like the Node job below.
+  # One `if:` per language.
   python:
     name: Python
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'python')
     uses: ./.github/workflows/_python.yml
 
-  # One `if:` per language.
   node:
     name: Node
     needs: detect
@@ -129,7 +129,7 @@ jobs:
             echo "| $(icon "$DETECT_RESULT") | **Detect** | changed-component discovery |"
             echo "| $(icon "$CONTRACT_RESULT") | **Contract** | generated constants current, no restated keys |"
             echo "| $(icon "$NODE_RESULT") | **Node** | lint, format, typecheck, tests, pack |"
-            echo "| $(icon "$PYTHON_RESULT") | **Python** | lint, format, typecheck, tests |"
+            echo "| $(icon "$PYTHON_RESULT") | **Python** | lint, format, typecheck, tests, build |"
             echo "| $(icon "$REPO_RESULT") | **Repository** | conventional commits, component registration |"
             echo
             echo "<sub>[Full run](${RUN_URL}) &middot; updated on every push</sub>"

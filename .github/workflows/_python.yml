@@ -1,13 +1,10 @@
-# The Python SDK's checks: lint, format, typecheck, tests.
+# The Python SDK's checks: lint, format, typecheck, tests, build.
 #
-# Called by both pr.yml and ci.yml, and for now it runs unconditionally, the
-# way the contract gate does. The per-language `if:` those files use is keyed
-# off the components registered with release-please, and `python` is not one
-# yet — registering it is what makes it releasable, and that waits for the
-# package to be complete. Until then, running on every pull request costs a
-# minute and means the suite is gating from the first commit that has one.
+# Called by both pr.yml and ci.yml, each gating it on `python` appearing in the
+# changed-component list the way they gate Node.
 #
-# No publish here, and no pack. Both arrive with the release wiring.
+# No publish here — _publish-python.yml owns that, and only the run that cut a
+# tag reaches it.
 name: Python
 
 on:
@@ -84,3 +81,57 @@ jobs:
 
       - name: Test
         run: python -m pytest
+
+  # The analogue of the Node SDK's `pack:check`: build what a consumer would
+  # actually install and inspect it, rather than trusting that the package
+  # metadata describes the artifact. `py.typed` is asserted explicitly because
+  # its absence is silent — the `Typing :: Typed` classifier keeps claiming the
+  # package is typed and a consumer's mypy is the thing that finds out.
+  build:
+    name: Build
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade 'pip>=25.1'
+          python -m pip install -e . --group dev
+
+      - name: Build
+        run: python -m build
+
+      - name: Check the distributions
+        run: python -m twine check --strict dist/*
+
+      - name: Assert the wheel ships py.typed and the licence
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+
+          wheels = glob.glob('dist/*.whl')
+          if len(wheels) != 1:
+              sys.exit(f'expected exactly one wheel, found {wheels}')
+
+          names = zipfile.ZipFile(wheels[0]).namelist()
+          missing = [
+              want
+              for want in ('octic_telemetry/py.typed',)
+              if want not in names
+          ]
+          if not any(n.endswith('licenses/LICENSE') for n in names):
+              missing.append('dist-info/licenses/LICENSE')
+          if missing:
+              sys.exit(f'{wheels[0]} is missing {missing}')
+
+          print(f'{wheels[0]}: py.typed and LICENSE present')
+          PY

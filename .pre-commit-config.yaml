@@ -46,6 +46,22 @@ repos:
         # formatter rewraps is prose nobody can review as a diff.
         files: ^(node|contract)/.*\.(ts|js|mjs|json)$
 
+  # Lint and format only. mypy is not here: it needs the package and its
+  # dependencies installed to say anything true, and a type checker running
+  # against an environment it did not build reports about the wrong thing. CI
+  # installs first and runs it there.
+  #
+  # The generated contract is excluded by ruff's own config rather than by a
+  # second pattern here — the hooks pass --force-exclude, so `[tool.ruff]`
+  # stays the one place that decides.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8
+    hooks:
+      - id: ruff-check
+        files: ^python/.*\.py$
+      - id: ruff-format
+        files: ^python/.*\.py$
+
   - repo: local
     hooks:
       # Regenerates the per-language constants and the published spec. When it
@@ -75,7 +91,7 @@ repos:
         entry: scripts/check-component-registration.sh
         language: script
         pass_filenames: false
-        files: ^(release-please-config\.json|\.release-please-manifest\.json|[^/]+/package\.json|[^/]+/version\.txt)$
+        files: ^(release-please-config\.json|\.release-please-manifest\.json|[^/]+/package\.json|[^/]+/version\.txt|[^/]+/pyproject\.toml)$
 
       # The same pattern CI enforces, applied before the commit exists rather
       # than after the pull request is open.

@@ -63,6 +63,22 @@ for component in "${configured[@]}"; do
         fi
       fi
       ;;
+    python)
+      if [ ! -f "$component/pyproject.toml" ]; then
+        echo "::error::$component is release-type python but has no pyproject.toml"
+        status=1
+      else
+        # No jq for TOML. `name` is unique enough in a pyproject that the first
+        # one is the [project] table's, and a second would be a key we do not
+        # set — so grep reads it rather than a dependency on a TOML parser.
+        declared="$(sed -n 's/^name = "\(.*\)"$/\1/p' "$component/pyproject.toml" | head -n 1)"
+        expected="$(jq -r --arg c "$component" '.packages[$c]["package-name"] // ""' "$CONFIG")"
+        if [ -n "$expected" ] && [ "$declared" != "$expected" ]; then
+          echo "::error file=$component/pyproject.toml::name is \"$declared\" but $CONFIG says \"$expected\""
+          status=1
+        fi
+      fi
+      ;;
     simple)
       if [ ! -f "$component/version.txt" ]; then
         echo "::error::$component is release-type simple but has no version.txt — release-please writes the version there"
