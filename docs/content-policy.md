@@ -7,7 +7,7 @@ it. This page says exactly what leaves your process and how to change it.
 
 | level | what leaves your process |
 |---|---|
-| `full` | the content, after your `redact` hook and `maxLength` |
+| `full` | the content, after your redact hook and the length cap |
 | `metadata` | `{"redacted":true,"chars":86,"sha256":"a3d44d6b…"}` — enough to tell whether two runs used the same prompt, without the prompt |
 | `none` | nothing |
 
@@ -25,6 +25,10 @@ Per process:
 init({ /* … */, content: { capture: 'none' } });
 ```
 
+```python
+init(..., content=ContentOptions(capture="none"))
+```
+
 Per run, on the same Context mechanism as identity — so the override reaches
 foreign spans too:
 
@@ -32,10 +36,15 @@ foreign spans too:
 withContent({ capture: 'metadata' }, () => /* … */);
 ```
 
+```python
+with with_content("metadata"):
+    ...
+```
+
 ## The current default is `full`, and that is temporary
 
-`init` defaults to `capture: 'full'`. This is an early-stage decision, not a
-claim that content is harmless.
+`init` defaults to `full`. This is an early-stage decision, not a claim that
+content is harmless.
 
 The reasoning: a product nobody can see the inside of cannot be evaluated. A
 first user whose traces show no prompts and no outputs cannot distinguish rich
@@ -49,17 +58,21 @@ on. It is tracked in
 [`handbook/TODO.md`](../handbook/TODO.md), and a test pins the default either
 way so the change cannot happen by accident.
 
-If you are deploying against real user data today: set `capture: 'none'`.
+If you are deploying against real user data today: set the level to `none`.
 
 ## Where it is enforced
 
 Not in one place, because content arrives on **two signals** and
 instrumentation libraries disagree about which:
 
-- **Spans** — a redacting wrapper around the OTLP span exporter.
+- **Spans** — a redacting wrapper around the span exporter.
 - **Log records** — a redacting processor ahead of the exporting one. This is
   not an edge case: the official OpenAI instrumentation puts *all* content on
   the logs signal.
+
+An SDK that does not carry the logs signal enforces only the first, and the
+second arrives with the signal. The Python SDK is traces-only today; the Node
+SDK carries both.
 
 The span side is enforced at the **exporter** rather than in a `SpanProcessor`,
 for two reasons that are worth knowing if you are reading the source: a
@@ -81,7 +94,7 @@ a denylist of similar attributes, at every content level including `full`.
 
 Which attribute keys count as content is derived from the
 [attribute contract](../contract/ATTRIBUTES.md): every attribute carrying
-`class: content`. The SDK's redaction list and the published spec are generated
+`class: content`. Each SDK's redaction list and the published spec are generated
 from the same source and cannot disagree, and CI fails if a hand-written source
 restates one of those keys as a literal.
 
