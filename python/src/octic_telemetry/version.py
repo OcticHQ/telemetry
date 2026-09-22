@@ -23,7 +23,7 @@ from .attributes_gen import OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON
 # could not identify a release. There is exactly one definition of each here.
 #
 # The trailing marker comment is load-bearing. Do not remove it.
-SDK_VERSION: Final = "0.0.0"  # x-release-please-version
+SDK_VERSION: Final = "0.1.0"  # x-release-please-version
 
 # From the contract rather than a literal, because this name is not ours alone:
 # the Node SDK uses the sibling member for the same two purposes, and
