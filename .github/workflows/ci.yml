@@ -46,12 +46,10 @@ jobs:
     name: Contract
     uses: ./.github/workflows/_contract.yml
 
-  # Runs on main as it does on pull requests, and deliberately does not gate
-  # release-please below: nothing Python is released yet, so a Python failure
-  # holding back a Node release would be the wrong coupling. When `python` is
-  # registered it joins that `needs` list alongside the Node job.
   python:
     name: Python
+    needs: detect
+    if: contains(fromJSON(needs.detect.outputs.components), 'python')
     uses: ./.github/workflows/_python.yml
 
   node:
@@ -75,11 +73,13 @@ jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
-    needs: [contract, node]
-    if: ${{ !cancelled() && needs.contract.result == 'success' && (needs.node.result == 'success' || needs.node.result == 'skipped') }}
+    needs: [contract, node, python]
+    if: ${{ !cancelled() && needs.contract.result == 'success' && (needs.node.result == 'success' || needs.node.result == 'skipped') && (needs.python.result == 'success' || needs.python.result == 'skipped') }}
     outputs:
       node-released: ${{ steps.release.outputs['node--release_created'] }}
       node-tag: ${{ steps.release.outputs['node--tag_name'] }}
+      python-released: ${{ steps.release.outputs['python--release_created'] }}
+      python-tag: ${{ steps.release.outputs['python--tag_name'] }}
 
     steps:
       # The default GITHUB_TOKEN cannot push past a branch ruleset — it is not a
@@ -121,4 +121,19 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
+
+  publish-python:
+    name: Publish Python
+    needs: release-please
+    if: needs.release-please.outputs.python-released == 'true'
+    uses: ./.github/workflows/_publish-python.yml
+    with:
+      # THE SWITCH, as above. The wheel is always built and uploaded as an
+      # artifact; PyPI only when this is true. A PyPI version can never be
+      # replaced or reused, and yanking one does not free the number — there is
+      # no 72-hour window the way npm has.
+      pypi: false
+    permissions:
+      contents: read
       id-token: write

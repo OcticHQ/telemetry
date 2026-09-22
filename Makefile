@@ -11,6 +11,7 @@
 .PHONY: help check install \
         contract-generate contract-generate-local contract-check \
         node-install node-lint node-format node-typecheck node-test node-build node-pack \
+        python-install python-lint python-format python-typecheck python-test python-build \
         repo-check
 
 help: ## Show this help
@@ -19,10 +20,10 @@ help: ## Show this help
 
 # ── everything ───────────────────────────────────────────────────────────────
 
-install: node-install ## Install every component's dependencies
+install: node-install python-install ## Install every component's dependencies
 	npm --prefix contract ci
 
-check: contract-check repo-check node-lint node-typecheck node-test ## Run what CI runs
+check: contract-check repo-check node-lint node-typecheck node-test python-lint python-typecheck python-test ## Run what CI runs
 
 # ── contract ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,40 @@ node-build: ## tsc to dist/
 
 node-pack: ## Build, then lint the tarball a consumer would receive
 	npm --prefix node run pack:check
+
+# ── python ───────────────────────────────────────────────────────────────────
+
+# Override to point at a virtualenv: `make python-test PY=python/.venv/bin/python`.
+# Everything below is what .github/workflows/_python.yml runs, from the same
+# directory, so a green `make` and a green CI mean the same thing.
+#
+# The recipes `cd python` first, which would otherwise resolve a relative
+# override against the wrong directory — silently, if a `python` happens to
+# exist at the matching path under python/. Anything with a slash in it is
+# absolutized here; a bare command is left alone for PATH to find.
+PY ?= python3
+PY_CMD := $(if $(findstring /,$(PY)),$(abspath $(PY)),$(PY))
+
+python-install: ## Install the Python SDK's dependencies (`--group` needs pip 25.1+)
+	$(PY_CMD) -m pip install --upgrade 'pip>=25.1'
+	cd python && $(PY_CMD) -m pip install -e . --group dev
+
+python-lint: ## ruff check + ruff format --check
+	cd python && $(PY_CMD) -m ruff check src tests
+	cd python && $(PY_CMD) -m ruff format --check src tests
+
+python-format: ## ruff format
+	cd python && $(PY_CMD) -m ruff format src tests
+
+python-typecheck: ## mypy over src and tests
+	cd python && $(PY_CMD) -m mypy src tests
+
+python-test: ## pytest
+	cd python && $(PY_CMD) -m pytest
+
+python-build: ## Build the wheel and sdist, then lint what a consumer would install
+	cd python && $(PY_CMD) -m build
+	cd python && $(PY_CMD) -m twine check --strict dist/*
 
 # ── repo ─────────────────────────────────────────────────────────────────────
 

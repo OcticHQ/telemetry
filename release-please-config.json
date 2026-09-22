@@ -15,6 +15,13 @@
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["src/version.ts"]
     },
+    "python": {
+      "release-type": "python",
+      "component": "python",
+      "package-name": "octic-telemetry",
+      "changelog-path": "CHANGELOG.md",
+      "extra-files": ["src/octic_telemetry/version.py"]
+    },
     "contract": {
       "release-type": "simple",
       "component": "contract",
