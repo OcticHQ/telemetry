@@ -1,12 +1,4 @@
-# The Python SDK — a usage guide
-
-`octic-telemetry` for Python. What it does, and how to use it.
-
-This guide teaches the package. For the model it implements in no particular
-language, read [concepts](concepts.md) first — it is shorter, and the API here
-is obvious once you have.
-
-## What it does
+# The Octic Telemetry Python SDK usage guide
 
 Your application already knows things no instrumentation can work out for
 itself: that five model calls were one agent doing one job, which prompt
@@ -19,20 +11,10 @@ who it was for, and none of it can be added to the data afterwards — by the ti
 a trace is stored, the knowledge that would have connected it is gone.
 
 So this package instruments nothing. It carries that knowledge on the
-OpenTelemetry context and stamps it onto spans, including **spans produced by
-instrumentation that has never heard of Octic**. Bring whichever OpenTelemetry
-instrumentation you already run; this enriches what it emits.
-
-The mechanism is one `SpanProcessor` whose `on_start` fires for every span
-created through the tracer provider. Two consequences worth internalising:
-
-1. **Your instrumentation choice does not matter to us.** The same processor
-   stamps spans from the OpenAI instrumentation, from OpenLLMetry, from
-   hand-rolled OpenTelemetry.
-2. **Exactly one copy of the OpenTelemetry API must exist in your
-   environment.** Two copies mean two context managers: values are set in one
-   and read from the other, and the stamping silently stops. This is the single
-   most common integration failure.
+OpenTelemetry context and stamps it onto spans, including spans produced by
+instrumentation that has never heard of Octic. Bring whichever OpenTelemetry
+instrumentation you already run; this enriches what it emits. The mechanism is one `SpanProcessor` whose `on_start` fires for every span
+created through the tracer provider.
 
 ## Install
 
@@ -44,7 +26,7 @@ Python 3.10 or newer. The only runtime dependencies are `opentelemetry-api` and
 `opentelemetry-sdk`; the package ships type information (`py.typed`) and no
 instrumentation.
 
-## Initialise
+## Initialize
 
 Once per process, before the libraries you want observed are imported:
 
@@ -54,7 +36,6 @@ from octic_telemetry import Agent, init
 telemetry = init(
     service_name="checkout-agent",
     service_version="1.4.2",
-    endpoint="https://ingest.octic.ai",
     agent=Agent(agent_id="refunds", name="Refunds Agent"),
     environment="production",
 )
@@ -69,22 +50,19 @@ matter, not at the top of a module that something else imports first.
 `init()` **never raises.** It returns a handle in all cases, and there are three
 outcomes — see [Failure behaviour](#failure-behaviour).
 
-### What `endpoint` does, and does not do
+### What `endpoint` does
 
-**`endpoint` is required and is never contacted.** This release makes no network
-call at all. The value is written into the spool manifest, which is how the
-reader that ships your telemetry knows where to deliver it.
-
-Both halves of that matter. Do not go looking for outbound traffic — there is
-none. Do not treat the value as decorative either — it is what gets your data to
-the right place, later, from another process.
+This release makes no network call. `endpoint` is recorded in the spool
+manifest, which is how the reader that ships your telemetry knows where to
+deliver it, and it defaults to Octic's ingest — set it only if your data goes
+somewhere else.
 
 ### Options
 
 | Option | Default | What it is |
 |---|---|---|
 | `service_name` | required | your service, as it appears in the resource |
-| `endpoint` | required | recorded in the spool manifest; never contacted |
+| `endpoint` | Octic's ingest | recorded in the spool manifest; never contacted |
 | `service_version` | `"0.0.0"` | your service's version |
 | `agent` | `None` | `Agent(agent_id=…, name=…, asset_ref=…)` |
 | `environment` | `None` | `production`, `staging` — stamped as the deployment environment |
@@ -134,7 +112,6 @@ from octic_telemetry import SpoolOptions, init
 
 init(
     service_name="checkout-agent",
-    endpoint="https://ingest.octic.ai",
     spool=SpoolOptions(
         dir="/var/spool/octic",
         max_bytes=64 * 1024 * 1024,   # default
@@ -317,7 +294,6 @@ from octic_telemetry import ContentOptions, init
 
 init(
     service_name="checkout-agent",
-    endpoint="https://ingest.octic.ai",
     content=ContentOptions(capture="none"),
 )
 ```
@@ -332,15 +308,16 @@ with with_content("metadata"):
     ...
 ```
 
-### The default is `full`, and that is deliberate but temporary
+### The default is `none`, and it is opt-in
 
-A product nobody can see the inside of cannot be evaluated, and a first
-integration whose traces show no prompts cannot be told apart from a broken
-pipeline. So content is opt-out while the thing is being evaluated.
+This differs from the Node SDK, which defaults to `full`. The reason is the
+spool: this SDK has no transport, so what it captures is written to a directory
+on the host's own disk and sits there at rest until a reader collects it.
+Defaulting to `full` would put a consumer's prompts on their disk because they
+installed a package, not because they decided to.
 
-**If you are deploying against real user data, set `capture="none"`.** Note in
-particular that `full` plus a spool directory means prompts written to the
-host's disk at rest.
+Turn it on deliberately when you want it — debugging an agent, or evaluating
+output quality — and prefer `metadata` where you only need to correlate.
 
 ### Redactors
 
@@ -440,7 +417,6 @@ from octic_telemetry import init_with_external_provider
 
 telemetry = init_with_external_provider(
     service_name="checkout-agent",
-    endpoint="https://ingest.octic.ai",
 )
 
 host_provider.add_span_processor(telemetry.span_processor)    # enriches
@@ -474,7 +450,7 @@ than on the resource, since the resource belongs to the host.
 | Nothing at all, and no error | `init()` ended `degraded` or `failed`. It already logged the reason — set `OCTIC_TELEMETRY_DEBUG=1` and read it. |
 | No spool directory appears | Every candidate was refused. A directory is rejected if it is a symlink, is not owned by you, or is group/world-writable. `telemetry.spool.directory()` returns `None`. |
 | The directory exists but stays empty | Nothing has been exported yet — the batch processor waits ~5s for company. `force_flush()` to check. |
-| Spans arrive with no prompts or outputs | Capture is `none` or `metadata`, or a redactor returned `None`. The default is `full`. |
+| Spans arrive with no prompts or outputs | Expected: the default is `none`. Set `capture="full"` if you want the text. |
 | Spans from your own code are stamped, foreign ones are not | Instrumentation was imported and patched before `init()` ran, or it uses its own provider rather than the global one. |
 | A decorated function's output is missing | Only the decorator forms read the return value. In a `with` block, call `set_output()`. |
 | Under `init_with_external_provider()`, host spans are enriched but annotations write nothing | The annotations use the global tracer provider and the host never registered itself as one. |

@@ -351,10 +351,21 @@ that as a deliberate exception to `AGENTS.md`'s "`docs/` is language-neutral".
 `0.0.0`, and rides on the wire as `octic.sdk.version`, until the first Release PR
 merges. The wiring is correct; only the release is missing.
 
-**`endpoint` being required and never contacted needed documenting twice.** It
-is the first thing a reader gets wrong in both directions — looking for outbound
-traffic that does not exist, or treating the value as decorative when it is what
-routes the data. It is called out in the guide, in the README and in ADR 0006.
+**Content capture defaults to `none` here, against the plan and against Node.**
+The plan said the SDK default is `full`, opt-out, matching Node. That reasoning
+was written for an SDK with a transport: content is opt-out there because a
+first integration showing no prompts cannot be told apart from a broken
+pipeline, and it is evaluated against nobody's real data. Neither holds for a
+spool-only SDK — what it captures is written to the consumer's own disk and
+sits at rest there until a reader collects it, so `full` would be a consequence
+of installing a package rather than a decision. `docs/content-policy.md` now
+carries a per-SDK table, and each SDK pins its own default with a test.
+
+**`endpoint` stopped being required.** It was a mandatory argument that nothing
+in the process reads, which is a decision with no information behind it and the
+first thing every reviewer of the documentation objected to. It now defaults to
+Octic's ingest. It cannot be removed outright: `SPOOL.md` v1 makes it a manifest
+field and hashes it into the manifest id.
 
 **One behaviour was found by running the guide's own examples.** Under
 `init_with_external_provider()`, the annotations resolve their tracer from the

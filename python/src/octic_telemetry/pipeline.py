@@ -59,6 +59,14 @@ from .version import SDK_NAME, SDK_VERSION
 
 log = logging.getLogger("octic_telemetry")
 
+#: Where the reader delivers, recorded in the spool manifest.
+#:
+#: ``SPOOL.md`` v1 requires the field and hashes it into the manifest id, so it
+#: has to have a value — but this SDK never contacts it, so making a consumer
+#: supply one was asking for a decision they have no way to make. Override it
+#: only if your telemetry goes somewhere other than Octic's ingest.
+DEFAULT_ENDPOINT = "https://ingest.octic.ai"
+
 
 class SpoolHandle:
     """The public view of the spool, so nothing outside this package holds the object.
@@ -408,7 +416,7 @@ def _already_initialized(state: _State, wanted: _StateKind) -> None:
 def init(
     *,
     service_name: str,
-    endpoint: str,
+    endpoint: str = DEFAULT_ENDPOINT,
     service_version: str = "0.0.0",
     agent: Agent | None = None,
     environment: str | None = None,
@@ -419,9 +427,10 @@ def init(
 ) -> Telemetry:
     """Creates, configures and registers the global tracer provider.
 
-    ``endpoint`` is not contacted. It is written into the spool manifest, which is
-    how the reader knows where to deliver. Never raises; a failure leaves the
-    process without telemetry and says so once.
+    ``endpoint`` is not contacted and defaults to Octic's ingest. It is written
+    into the spool manifest, which is how the reader knows where to deliver.
+    Never raises; a failure leaves the process without telemetry and says so
+    once.
     """
     global _state
     with _state_lock:
@@ -476,7 +485,7 @@ def init(
 def init_with_external_provider(
     *,
     service_name: str,
-    endpoint: str,
+    endpoint: str = DEFAULT_ENDPOINT,
     service_version: str = "0.0.0",
     agent: Agent | None = None,
     environment: str | None = None,

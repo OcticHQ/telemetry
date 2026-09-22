@@ -44,14 +44,12 @@ from octic_telemetry import Agent, init
 telemetry = init(
     service_name="checkout-agent",
     service_version="1.4.2",
-    endpoint="https://ingest.octic.ai",
     agent=Agent(agent_id="refunds", name="Refunds Agent"),
     environment="production",
 )
 ```
 
-`endpoint` is **not contacted**. It is recorded in the spool manifest, which is
-how the reader knows where to deliver. `init()` never raises.
+`init()` never raises.
 
 Then annotate what only your application knows:
 
@@ -99,9 +97,10 @@ survive with content switched off.
 | `metadata` | a length and a hash, not the content |
 | `none` | nothing. Everything else is untouched, and the product works here |
 
-Set it per process with `init(content=ContentOptions(capture="none"))`, or per
-run with `with_content`. The default is `full`; if you are deploying against
-real user data, set `none`.
+The default is **`none`** — unlike the Node SDK, because this SDK writes to a
+directory on the host's own disk rather than sending anywhere, and content there
+sits at rest. Set it per process with
+`init(content=ContentOptions(capture="full"))`, or per run with `with_content`.
 
 ## Requirements
 

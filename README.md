@@ -53,7 +53,8 @@ published spec, and CI fails if any of them drift.
 | [docs/concepts.md](docs/concepts.md) | identity, runs, conversations, agents — the model, in no language |
 | [docs/content-policy.md](docs/content-policy.md) | what leaves your process, and how to switch it off |
 | [docs/wire-format.md](docs/wire-format.md) | OTLP endpoints, authentication, what we accept |
-| [docs/python-guide.md](docs/python-guide.md) | the Python SDK's features and how to use them |
+| [docs/python-consumer-guide.md](docs/python-consumer-guide.md) | the Python SDK in three steps — what a consumer is sent |
+| [docs/python-guide.md](docs/python-guide.md) | the Python SDK in full — every option and failure mode |
 | [contract/ATTRIBUTES.md](contract/ATTRIBUTES.md) | the attribute spec |
 | Each SDK's `README.md` | installation and usage for that language |
 
