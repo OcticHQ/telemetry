@@ -130,10 +130,10 @@ jobs:
     uses: ./.github/workflows/_publish-python.yml
     with:
       # THE SWITCH, as above. The wheel is always built and uploaded as an
-      # artifact; PyPI only when this is true. A PyPI version can never be
-      # replaced or reused, and yanking one does not free the number — there is
-      # no 72-hour window the way npm has.
-      pypi: false
+      # artifact; PyPI only when this is true. Turning it off does not unpublish
+      # anything — a PyPI version can never be replaced or reused, and yanking
+      # one does not free the number.
+      pypi: true
     permissions:
       contents: read
       id-token: write

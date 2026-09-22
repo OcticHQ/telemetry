@@ -4,13 +4,12 @@
 # with one difference forced by the ecosystem:
 #
 #   workflow artifact — always. GitHub Packages hosts no Python index, so there
-#                       is no pre-public registry to mirror npm's. What takes
-#                       its place is the built wheel and sdist, uploaded and
-#                       retained, so every tag has an inspectable, installable
-#                       artifact that reached no public index.
-#   PyPI              — off. Gated behind the `pypi` input, which ci.yml passes
-#                       as `false`. Flipping that one literal to `true` is what
-#                       makes the SDK public.
+#                       is no registry to mirror npm's pre-public one. What
+#                       takes its place is the built wheel and sdist, uploaded
+#                       and retained, so every tag has an inspectable artifact
+#                       whether or not the upload below ran.
+#   PyPI              — gated behind the `pypi` input, so a release can be cut
+#                       without publishing one.
 #
 # Called by ci.yml only, and only when release-please reports that it created a
 # release for the `python` component — that is, when the Release PR was merged
@@ -83,16 +82,13 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────
-  # PyPI — asleep
+  # PyPI
   # ─────────────────────────────────────────────
   #
-  # Everything here is wired and ready; only the `if` keeps it asleep.
-  #
-  # Before the first real run, the PyPI project must be configured with a
-  # trusted publisher naming this repository, this workflow file and the `pypi`
-  # environment. That cannot be done from here, and without it this job fails at
-  # the upload step with an authentication error rather than a useful one. It is
-  # tracked in handbook/TODO.md.
+  # Authenticates as a trusted publisher on the PyPI project, which names this
+  # repository, this workflow file and the `pypi` environment. Nothing here
+  # holds a credential; change any of those three and the upload stops being
+  # authorised.
   pypi:
     name: PyPI publish
     if: inputs.pypi
