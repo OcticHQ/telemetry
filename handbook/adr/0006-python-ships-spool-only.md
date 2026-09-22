@@ -31,10 +31,12 @@ package.
 call.** No HTTP exporter, no enrollment token, no credential, no refresh.
 `SPOOL.md` v1 conformance is the acceptance criterion.
 
-`endpoint` remains a **required** parameter of `init()`. It is not contacted; it
-is recorded in the spool manifest, because the reader needs to know where to
-deliver and the application is the only thing that knows. Requiring it keeps the
-signature stable when a transport does arrive.
+`endpoint` **defaults** to Octic's ingest and is not contacted. `SPOOL.md` v1
+requires the field and hashes it into the manifest id, so it must have a value —
+but requiring a consumer to supply one asks them to make a decision they have no
+information for, about a value nothing in their process reads. It stays a
+parameter, so a consumer delivering somewhere else can say so, and the signature
+is stable when a transport arrives.
 
 The spooling exporter is a plain `SpanExporter`, so an auth-retrying HTTP
 exporter can later be inserted in front of it without the spool changing.
@@ -58,8 +60,11 @@ These follow from the above rather than deserving their own record:
 
 ### Where the documentation lives
 
-The per-language usage guide is `docs/python-guide.md`, beside the
-language-neutral documents rather than inside `python/`. `AGENTS.md` scopes
+There are two per-language documents, because they have different readers.
+`docs/python-consumer-guide.md` is what a consumer is sent: install, initialise,
+annotate, and nothing they did not ask for. `docs/python-guide.md` is the
+complete one — every option, the failure modes, running under a host SDK. Both
+sit beside the language-neutral documents rather than inside `python/`. `AGENTS.md` scopes
 `docs/` to language-neutral prose, so this is a deliberate exception: `docs/` is
 where a reader is sent, and the alternative — a second long document inside
 `python/` — competes with `python/README.md`, which is the registry page and has
@@ -78,9 +83,12 @@ to stay short. The language-neutral documents stay language-neutral; a
   else. This is the cost, it is not obvious from the package name, and every
   piece of user-facing documentation has to say it plainly. A second consumer
   who wants direct delivery is blocked until the transport is written.
-- **Negative**: `full` content capture plus a spool directory means prompts
-  written to the host's disk at rest — a property the Node SDK has only on its
-  failure path, and this one has always.
+- **Neutral**: content capture defaults to `none` here and to `full` in Node.
+  The SDKs disagree deliberately: content written by a spool-only SDK sits at
+  rest on the consumer's disk, which is a property Node has only on its failure
+  path and this one has always. The cost is that the two SDKs behave differently
+  out of the box, so neither README can state the default on the other's
+  behalf.
 - **Neutral**: the two SDKs have genuinely different surfaces, so
   language-neutral prose has to stop claiming both do the same thing. `docs/`
   now names which SDK it means where they differ.
@@ -93,11 +101,12 @@ to stay short. The language-neutral documents stay language-neutral; a
   consumer exists yet: it is a large, credential-handling body of code written
   speculatively, and the shape it should take is best decided by the consumer
   that needs it.
-- **Make `endpoint` optional, since nothing contacts it.** Honest about today,
-  but it makes the manifest incomplete by default and turns adding a transport
-  into a breaking signature change. Rejected: requiring a value that is only
-  recorded is a smaller surprise than a spool a reader cannot route, and the
-  documentation can carry the explanation.
+- **Drop `endpoint` entirely, since nothing contacts it.** The smallest surface,
+  and the one a consumer reading the signature would expect. Rejected because
+  `SPOOL.md` v1 makes it a manifest field and part of the manifest id hash, so
+  removing it would either break the format or hardcode one ingest host into the
+  package — and a consumer whose data goes somewhere else would then have no way
+  to say so. Defaulting it costs nothing and keeps that door open.
 - **Ship the reader in this package.** Would make one install sufficient.
   Rejected because the reader is a separate long-lived process with different
   operational properties, it is owned elsewhere, and `SPOOL.md` exists precisely

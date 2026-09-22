@@ -98,6 +98,23 @@ def build(options: ContentOptions | None = None) -> Harness:
 
 @pytest.fixture
 def harness() -> Iterator[Harness]:
+    """Content on, asked for explicitly.
+
+    The package default is ``none``, so a test about what content does has to
+    turn it on — otherwise it asserts about the default instead of about
+    itself, and flipping the default again would quietly gut the suite.
+    ``harness_default`` is the one that takes the default as it ships.
+    """
+    reset_counters()
+    yield build(ContentOptions(capture="full"))
+    _swappable.inner = None
+    set_active_policy(resolve_policy())
+    reset_counters()
+
+
+@pytest.fixture
+def harness_default() -> Iterator[Harness]:
+    """Whatever ``ContentOptions()`` ships as, so one test pins it."""
     reset_counters()
     yield build()
     _swappable.inner = None

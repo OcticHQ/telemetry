@@ -45,7 +45,7 @@ def test_a_broken_redactor_never_becomes_the_customers_problem() -> None:
     def wrong_type(value: str, key: str) -> str:
         return 7  # type: ignore[return-value]
 
-    harness = build(ContentOptions(redact=wrong_type))
+    harness = build(ContentOptions(capture="full", redact=wrong_type))
     with with_tool(name="lookup", input="hello"):
         pass
 

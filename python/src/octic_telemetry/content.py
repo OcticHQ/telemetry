@@ -63,7 +63,13 @@ Redactor = Callable[[str, str], "str | None"]
 
 @dataclass(frozen=True)
 class ContentOptions:
-    capture: ContentCapture = "full"
+    #: Opt **in**, unlike the Node SDK, which defaults to ``full`` while it is
+    #: evaluated against nobody's real data. This SDK has no transport: what it
+    #: writes goes to a directory on the host's own disk, where content sits at
+    #: rest for as long as it takes a reader to collect it. Defaulting to
+    #: anything else would put a consumer's prompts on their disk because they
+    #: installed a package, not because they chose to.
+    capture: ContentCapture = "none"
     #: Last chance to scrub a value the customer knows the shape of better than
     #: we do. Runs only under ``full``. MUST NOT raise — and if it does we drop
     #: the value rather than falling through to the original, because a broken
@@ -79,7 +85,7 @@ class ContentOptions:
 
 @dataclass(frozen=True)
 class ContentPolicy:
-    capture: ContentCapture = "full"
+    capture: ContentCapture = "none"
     redact: Redactor | None = None
     max_length: int = 4096
     allow: frozenset[str] = field(default_factory=frozenset)

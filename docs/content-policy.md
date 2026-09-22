@@ -26,7 +26,7 @@ init({ /* … */, content: { capture: 'none' } });
 ```
 
 ```python
-init(..., content=ContentOptions(capture="none"))
+init(..., content=ContentOptions(capture="full"))   # Python defaults to none
 ```
 
 Per run, on the same Context mechanism as identity — so the override reaches
@@ -41,24 +41,30 @@ with with_content("metadata"):
     ...
 ```
 
-## The current default is `full`, and that is temporary
+## The default differs by SDK, and the difference is the transport
 
-`init` defaults to `full`. This is an early-stage decision, not a claim that
-content is harmless.
+| SDK | default |
+|---|---|
+| Node | `full` |
+| Python | `none` |
 
-The reasoning: a product nobody can see the inside of cannot be evaluated. A
-first user whose traces show no prompts and no outputs cannot distinguish rich
-telemetry from a broken pipeline — and a silent zero-data run is by a distance
-the most common failure in this space. So content is **opt-out** while the
-thing is being evaluated against nobody's real data.
+**Node defaults to `full`,** and that is temporary. A product nobody can see the
+inside of cannot be evaluated: a first user whose traces show no prompts and no
+outputs cannot distinguish rich telemetry from a broken pipeline, and a silent
+zero-data run is by a distance the most common failure in this space. So content
+is opt-out there while the thing is being evaluated against nobody's real data.
+The expectation is that it flips to `none` before any real tenant is onboarded,
+with the tenant-level setting becoming the thing that turns content on — tracked
+in [`handbook/TODO.md`](../handbook/TODO.md).
 
-The expectation is that this flips to `none` before any real tenant is
-onboarded, with the tenant-level setting becoming the thing that turns content
-on. It is tracked in
-[`handbook/TODO.md`](../handbook/TODO.md), and a test pins the default either
-way so the change cannot happen by accident.
+**Python defaults to `none`,** because it has no transport. What it captures is
+written to a directory on the host's own disk and sits there at rest until a
+reader collects it, so defaulting to `full` would put a consumer's prompts on
+their own disk as a consequence of installing a package. Opt in there.
 
-If you are deploying against real user data today: set the level to `none`.
+Each SDK pins its own default with a test, so neither can change by accident.
+
+If you are deploying Node against real user data today: set the level to `none`.
 
 ## Where it is enforced
 

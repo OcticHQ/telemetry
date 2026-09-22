@@ -21,7 +21,18 @@ from octic_telemetry import (
 PROMPT = "the customer asked about their balance"
 
 
-def test_the_default_is_full_and_content_is_sent(harness: Harness) -> None:
+def test_the_default_is_none_and_no_content_is_sent(harness_default: Harness) -> None:
+    """Pinned, so the default cannot change by accident in either direction."""
+    with with_tool(name="lookup", input={"q": PROMPT}) as scope:
+        scope.set_output({"a": PROMPT})
+
+    attributes = attrs(harness_default.one())
+    assert ATTR.OCTIC_ENTITY_INPUT not in attributes
+    assert ATTR.OCTIC_ENTITY_OUTPUT not in attributes
+    assert attributes[ATTR.GEN_AI_TOOL_NAME] == "lookup"
+
+
+def test_full_sends_content(harness: Harness) -> None:
     with with_tool(name="lookup", input={"q": PROMPT}):
         pass
     assert PROMPT in attrs(harness.one())[ATTR.OCTIC_ENTITY_INPUT]
@@ -131,7 +142,11 @@ def test_current_capture_reads_the_override_then_the_policy() -> None:
 
 
 def test_a_customer_redactor_runs_and_can_drop_a_value() -> None:
-    harness = build(ContentOptions(redact=lambda value, key: None if "balance" in value else value))
+    harness = build(
+        ContentOptions(
+            capture="full", redact=lambda value, key: None if "balance" in value else value
+        )
+    )
     with with_tool(name="lookup", input={"q": PROMPT}):
         pass
 
@@ -144,7 +159,7 @@ def test_a_raising_redactor_fails_closed() -> None:
     def explode(value: str, key: str) -> str:
         raise RuntimeError("redactor is broken")
 
-    harness = build(ContentOptions(redact=explode))
+    harness = build(ContentOptions(capture="full", redact=explode))
     with with_tool(name="lookup", input={"q": PROMPT}):
         pass
 
@@ -152,7 +167,7 @@ def test_a_raising_redactor_fails_closed() -> None:
 
 
 def test_max_length_caps_what_leaves() -> None:
-    harness = build(ContentOptions(max_length=32))
+    harness = build(ContentOptions(capture="full", max_length=32))
     with with_tool(name="lookup", input="x" * 500):
         pass
 
@@ -164,7 +179,7 @@ def test_max_length_caps_what_leaves() -> None:
 def test_allow_attributes_exempts_a_key_that_looks_like_content(
     tracer: trace.Tracer,
 ) -> None:
-    harness = build(ContentOptions(allow_attributes=["gen_ai.input.messages"]))
+    harness = build(ContentOptions(capture="full", allow_attributes=["gen_ai.input.messages"]))
     with tracer.start_as_current_span("vendor", attributes={"gen_ai.input.messages": PROMPT}):
         pass
     assert attrs(harness.one())["gen_ai.input.messages"] == PROMPT
@@ -221,7 +236,9 @@ def test_a_long_string_on_our_own_span_is_not_guessed_at(harness: Harness) -> No
 
 
 def test_a_sequence_under_full_is_redacted_element_by_element(tracer: trace.Tracer) -> None:
-    harness = build(ContentOptions(redact=lambda value, key: value.replace("secret", "***")))
+    harness = build(
+        ContentOptions(capture="full", redact=lambda value, key: value.replace("secret", "***"))
+    )
     with tracer.start_as_current_span(
         "vendor", attributes={"gen_ai.input.messages": ["a secret", "b secret"]}
     ):
@@ -231,7 +248,9 @@ def test_a_sequence_under_full_is_redacted_element_by_element(tracer: trace.Trac
 
 def test_a_sequence_with_one_dropped_element_is_dropped_whole(tracer: trace.Tracer) -> None:
     """A sparse list is a hole a consumer cannot interpret."""
-    harness = build(ContentOptions(redact=lambda value, key: None if "drop" in value else value))
+    harness = build(
+        ContentOptions(capture="full", redact=lambda value, key: None if "drop" in value else value)
+    )
     with tracer.start_as_current_span(
         "vendor", attributes={"gen_ai.input.messages": ["keep", "drop me"]}
     ):
