@@ -1096,7 +1096,10 @@ const LANGUAGES: LanguageTarget[] = [
       'python/src/octic_telemetry/agent.py',
       'python/src/octic_telemetry/annotations.py',
       'python/src/octic_telemetry/attributes.py',
+      'python/src/octic_telemetry/batching.py',
       'python/src/octic_telemetry/content.py',
+      'python/src/octic_telemetry/context_scope.py',
+      'python/src/octic_telemetry/counters.py',
       'python/src/octic_telemetry/identity.py',
       'python/src/octic_telemetry/otlp_json.py',
       'python/src/octic_telemetry/pipeline.py',
@@ -1104,7 +1107,15 @@ const LANGUAGES: LanguageTarget[] = [
       'python/src/octic_telemetry/prompt.py',
       'python/src/octic_telemetry/redacting_exporter.py',
       'python/src/octic_telemetry/run.py',
+      'python/src/octic_telemetry/safe_exporter.py',
+      'python/src/octic_telemetry/safe_processor.py',
       'python/src/octic_telemetry/sanitize.py',
+      'python/src/octic_telemetry/silence_watch.py',
+      // The spool pair, for the reason the Node list gives above: what it writes
+      // to disk is the serialized OTLP body, so a key it named itself would leak
+      // into a file format an external reader parses against contract/SPOOL.md.
+      'python/src/octic_telemetry/spool.py',
+      'python/src/octic_telemetry/spool_exporter.py',
       // Holds this SDK's own `octic.sdk.name`, which is also the instrumentation
       // scope its spans carry. As with the Node counterpart the check cannot
       // catch a restated copy here — `owned` covers keys, not enum values — so
