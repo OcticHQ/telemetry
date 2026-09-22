@@ -314,3 +314,58 @@ writer id in a forked child (`os.register_at_fork`), which Node never needed.
 **The silence warning is keyed to segments** and armed only once `init()` has
 run, so a process that imports the package and never configures it is not
 warned about spans it never asked to send.
+
+### A3 — what PR C settled (after PR C landed)
+
+**PR C split in two.** C1 is the release wiring — registration, CI gating, the
+publish workflow, the Makefile, `pre-commit`, packaging correctness. C2 is the
+prose. They are different kinds of review, and the second can be written while
+the first is in review.
+
+**The drift-list work was the opposite shape to the one this plan feared.** The
+plan said the first Python file added to `handWritten` would also require
+teaching `restatedKeys` about `#` comments and docstrings. That had already been
+done before PR C started. What was actually missing was eight *files* —
+`batching.py`, `context_scope.py`, `counters.py`, `safe_exporter.py`,
+`safe_processor.py`, `silence_watch.py`, and the spool pair. `spool.py` and
+`spool_exporter.py` are the ones that matter, on the argument the Node list
+already carries: what the spool writes to disk is the serialized OTLP body, so a
+key it named itself leaks into a file format an external reader parses against
+`SPOOL.md`.
+
+**`docs/` was not language-neutral.** The plan budgeted one line — the single
+"the Node SDK" mention in `wire-format.md`. In fact `concepts.md` and
+`content-policy.md` named the whole API in camelCase and fenced their examples
+as `ts`, so a Python reader sent there read a document about a different SDK.
+Both now carry each language's form; where the SDKs genuinely differ — the logs
+signal, credential refresh — the prose names which one it means instead of
+generalising a feature only one of them has.
+
+**A standalone usage guide was written, and the plan never named it.**
+`docs/python-guide.md` is the client-shareable document: what the SDK does and
+how to use it, teaching rather than specifying. It sits in `docs/` rather than
+`python/` so that `python/README.md` can stay a registry page; ADR 0006 records
+that as a deliberate exception to `AGENTS.md`'s "`docs/` is language-neutral".
+
+**Registering the component does not fix the version.** `SDK_VERSION` stays
+`0.0.0`, and rides on the wire as `octic.sdk.version`, until the first Release PR
+merges. The wiring is correct; only the release is missing.
+
+**`endpoint` being required and never contacted needed documenting twice.** It
+is the first thing a reader gets wrong in both directions — looking for outbound
+traffic that does not exist, or treating the value as decorative when it is what
+routes the data. It is called out in the guide, in the README and in ADR 0006.
+
+**One behaviour was found by running the guide's own examples.** Under
+`init_with_external_provider()`, the annotations resolve their tracer from the
+*global* provider. Practically every host SDK registers itself globally — that
+is why `init()` has to check — but one that does not leaves `with_workflow`
+producing non-recording spans while the host's own spans are enriched normally.
+The guide says so; nothing in the code changed.
+
+**PyPI publishing has no GitHub Packages equivalent.** Node publishes to GitHub
+Packages always and public npm behind a switch. GitHub Packages hosts no Python
+index, so what takes its place is the built wheel and sdist, checked and uploaded
+as a workflow artifact on the run that cut the tag. The PyPI leg is gated behind
+`pypi: false` and needs a trusted publisher that cannot be configured from this
+repository — `handbook/TODO.md` carries it.

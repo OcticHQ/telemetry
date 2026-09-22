@@ -25,7 +25,7 @@ the data afterwards.
 | SDK | Package | Tag | Status |
 |---|---|---|---|
 | [Node](node) | `@octichq/telemetry` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
-| Python | `octic-telemetry` (PyPI) | `python/vX.Y.Z` | planned |
+| [Python](python) | `octic-telemetry` (PyPI) | `python/vX.Y.Z` | landed — spool-only, unreleased |
 | Go | `github.com/OcticHQ/telemetry/go` | `go/vX.Y.Z` | planned |
 
 Every SDK versions independently. `node` at `2.x` while `python` is at `0.1.0`
@@ -53,6 +53,7 @@ published spec, and CI fails if any of them drift.
 | [docs/concepts.md](docs/concepts.md) | identity, runs, conversations, agents — the model, in no language |
 | [docs/content-policy.md](docs/content-policy.md) | what leaves your process, and how to switch it off |
 | [docs/wire-format.md](docs/wire-format.md) | OTLP endpoints, authentication, what we accept |
+| [docs/python-guide.md](docs/python-guide.md) | the Python SDK's features and how to use them |
 | [contract/ATTRIBUTES.md](contract/ATTRIBUTES.md) | the attribute spec |
 | Each SDK's `README.md` | installation and usage for that language |
 

@@ -55,12 +55,16 @@ verification failure at ingest, expiry included, is one 401: the status is what
 tells a client to refresh and retry, and a 403 would not.
 
 **Because the token expires, an integration needs something that renews it.**
-That is one of the reasons the SDK exists rather than a documented curl
-snippet: a static credential pasted into an exporter config would stop working
-mid-run. The Node SDK does this with
-`auth: { kind: 'enrollmentToken', enrollmentToken, tokenUrl }` — it exchanges
-on startup, renews at half the token's life, and retries an export once with a
-fresh token when ingest answers 401.
+That is one of the reasons an SDK exists rather than a documented curl snippet:
+a static credential pasted into an exporter config would stop working mid-run.
+
+Renewal is per-SDK, because not every SDK talks to ingest at all. The **Node
+SDK** does it with `auth: { kind: 'enrollmentToken', enrollmentToken, tokenUrl }`
+— it exchanges on startup, renews at half the token's life, and retries an
+export once with a fresh token when ingest answers 401. The **Python SDK** has
+no credential and makes no request: it writes batches to a spool directory and a
+separate reader process delivers them, so everything on this page describes what
+that reader does, not what the SDK does.
 
 For consumers who cannot run an SDK, a long-lived key branch is planned; until
 it exists, that path is not supported.

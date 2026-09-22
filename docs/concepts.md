@@ -26,15 +26,21 @@ attach it to spans produced by whatever instrumentation you already run.
 
 ## The mechanism
 
-One OpenTelemetry `SpanProcessor`, registered globally. Its `onStart` fires for
-**every** span created through the global provider — including spans from
-libraries we have never heard of — reads values off the OTel Context, and
-stamps them as attributes.
+One OpenTelemetry `SpanProcessor`, registered globally. Its start callback
+(`onStart` / `on_start`) fires for **every** span created through the global
+provider — including spans from libraries we have never heard of — reads values
+off the OTel Context, and stamps them as attributes.
 
-```
+```ts
 withIdentity({ conversationId, userId }, () =>       ← puts values on the Context
   withWorkflow({ name: 'refund-request' }, () =>     ← opens a run, starts a span
     openai.chat.completions.create(…)))              ← foreign span, stamped on start
+```
+
+```python
+with with_identity(conversation_id=…, user_id=…):    ← puts values on the Context
+    with with_workflow(name="refund-request"):       ← opens a run, starts a span
+        openai.chat.completions.create(…)            ← foreign span, stamped on start
 ```
 
 Two consequences worth internalising:
@@ -52,12 +58,12 @@ Two consequences worth internalising:
 Each is a nesting level, and each is set on the Context rather than by
 decorating a call site.
 
-| Scope | Set by | Lives for |
-|---|---|---|
-| **Agent** | `init` (or `withAgent`) | the process |
-| **Conversation** | `withIdentity` | many requests, many traces |
-| **Run** | `withWorkflow` | one unit of work, one trace |
-| **Prompt** | `withPrompt` | one model call |
+| Scope | Node | Python | Lives for |
+|---|---|---|---|
+| **Agent** | `init` (or `withAgent`) | `init` (or `with_agent`) | the process |
+| **Conversation** | `withIdentity` | `with_identity` | many requests, many traces |
+| **Run** | `withWorkflow` | `with_workflow` | one unit of work, one trace |
+| **Prompt** | `withPrompt` | `with_prompt` | one model call |
 
 ### Conversations are not traces
 
@@ -71,9 +77,9 @@ the transport knows that request 2 continues request 1.
 
 ### Runs are minted, not observed
 
-`withWorkflow` mints `octic.run.id` and opens the span everything else nests
-under. Only your code knows where a turn begins — the first model call of a run
-looks identical to the second.
+The workflow annotation (`withWorkflow` / `with_workflow`) mints `octic.run.id`
+and opens the span everything else nests under. Only your code knows where a
+turn begins — the first model call of a run looks identical to the second.
 
 The run id is also the primary key for things that arrive *after* the run
 closed: evaluations, and end-user feedback. Those are writes against the run
@@ -82,7 +88,7 @@ back.
 
 ### Targets are what makes the graph join
 
-`withTool` and `withRetrieval` record **what was touched** — a datastore, an
+The tool and retrieval annotations record **what was touched** — a datastore, an
 API, a dashboard — not just that something was. That reference is what connects
 a trace to the governed asset inventory, and it is unavailable to any
 interception layer, which sees an HTTP call to a hostname at best.
