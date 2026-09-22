@@ -140,14 +140,13 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
 
 ## Tooling
 
-- [ ] **Configure the PyPI trusted publisher before the first Python publish.**
-      `.github/workflows/_publish-python.yml` authenticates by OIDC and carries
-      no token, so the PyPI project must name this repository, that workflow
-      file and the `pypi` environment as a trusted publisher. It cannot be done
-      from this repository. Until it is, flipping `pypi: false` in `ci.yml`
-      fails at the upload step with an authentication error and nothing more
-      useful. The project name `octic-telemetry` should also be registered on
-      PyPI before it is needed, rather than discovered to be taken.
+- [x] **Add the PyPI pending publisher.** Done — `octic-telemetry`, repository
+      `OcticHQ/telemetry`, workflow `_publish-python.yml`, environment `pypi`.
+      PyPI has no way to reserve a name, so a *pending publisher* both claims
+      the name and configures the OIDC trust; the first successful upload
+      converts it to an ordinary trusted publisher, which is the state to
+      expect afterwards. Note the workflow it names is the **reusable** one
+      that runs the upload, not the `ci.yml` that calls it.
 - [ ] **Revisit release-please at 1.0.**
       [ADR 0002](adr/0002-per-sdk-versioning.md) chose it partly for the 0.x
       mode, which stops mattering at 1.0. The tag namespace is portable to
