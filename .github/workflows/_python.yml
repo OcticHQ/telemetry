@@ -3,8 +3,7 @@
 # Called by both pr.yml and ci.yml, each gating it on `python` appearing in the
 # changed-component list the way they gate Node.
 #
-# No publish here — _publish-python.yml owns that, and only the run that cut a
-# tag reaches it.
+# No publish here — publish-python.yml owns that, triggered by the release tag.
 name: Python
 
 on:

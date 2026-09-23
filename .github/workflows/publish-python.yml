@@ -1,0 +1,148 @@
+# Publish octic-telemetry to PyPI.
+#
+# **Top-level on purpose.** This was a reusable workflow called from ci.yml, and
+# PyPI rejected the upload: a reusable workflow produces an OIDC token whose
+# `job_workflow_ref` is the reusable file while the Sigstore certificate's Build
+# Config URI is the *calling* workflow. The trusted publisher can only name one
+# of them, so authentication passed and attestation verification failed with a
+# 400. Trusted Publishing does not support reusable workflows. Keeping the
+# upload in the workflow that GitHub considers the entry point makes both claims
+# name this file.
+#
+# So: do not convert this back into a `workflow_call`, and do not move the
+# publish step into another workflow. The trusted publisher on pypi.org names
+# this filename, and changing it here without changing it there stops the upload
+# being authorised.
+#
+# Runs on the tag release-please cuts. That tag is pushed with the org's
+# "Semantic Release" app token rather than the default GITHUB_TOKEN, which is
+# what allows it to start this workflow at all.
+#
+# `workflow_dispatch` is the retry path: a failed upload cannot be re-driven by
+# the tag, which already exists, and without a manual trigger the only way
+# forward would be burning a version number. It takes the tag as an *input*
+# rather than expecting you to dispatch from it — GitHub reads the workflow
+# definition from the ref you pick, and a tag cut before this file existed has
+# no definition to read. Dispatch from the default branch and name the tag.
+#
+# A PyPI version can never be replaced or reused, and yanking one does not free
+# the number. There is no 72-hour window the way npm has.
+name: Publish Python
+
+on:
+  push:
+    tags:
+      # Both separators on purpose. release-please's `tag-separator` defaults to
+      # `-`, so the tags that exist are `python-v0.1.0`, while AGENTS.md
+      # documents `python/v0.1.0` and the config means to ask for it. Matching
+      # both means this keeps firing whichever way that is settled.
+      - 'python-v*'
+      - 'python/v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. python-v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  pypi:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    # The gate, now that there is no `pypi:` input to flip. Add required
+    # reviewers to this environment if a release should wait for a human.
+    environment: pypi
+
+    permissions:
+      contents: read
+      # Required for PyPI trusted publishing (OIDC). This is what replaces a
+      # long-lived API token, and what mints the attestations on the project
+      # page.
+      id-token: write
+
+    defaults:
+      run:
+        working-directory: python
+
+    steps:
+      # The tag's code, not the dispatching branch's. On a tag push the two are
+      # the same; on a dispatch they are not, and publishing whatever the
+      # default branch happens to hold is how a wrong version becomes permanent.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+          cache: pip
+          cache-dependency-path: python/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade 'pip>=25.1'
+          python -m pip install -e . --group dev
+
+      - name: Build
+        run: python -m build
+
+      - name: Check the distributions
+        run: python -m twine check --strict dist/*
+
+      # Unconditional, and the same on both triggers: a version number cannot be
+      # taken back, so the thing that was built has to be the thing the tag
+      # names.
+      - name: Check the version matches the tag
+        env:
+          TARGET_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          tag_version="$(printf '%s' "$TARGET_TAG" | sed -E 's|^python[-/]v||')"
+          built="$(ls dist/*.tar.gz | sed -E 's|.*/octic_telemetry-(.*)\.tar\.gz|\1|')"
+          if [ "$tag_version" != "$built" ]; then
+            echo "::error::$TARGET_TAG says $tag_version, built $built"
+            exit 1
+          fi
+          echo "$built matches $TARGET_TAG"
+
+      # `py.typed` missing is silent: the Typing :: Typed classifier keeps
+      # claiming the package is typed and a consumer's mypy is what finds out.
+      - name: Assert the wheel ships py.typed and the licence
+        run: |
+          python - <<'PY'
+          import glob, sys, zipfile
+
+          wheels = glob.glob('dist/*.whl')
+          if len(wheels) != 1:
+              sys.exit(f'expected exactly one wheel, found {wheels}')
+
+          names = zipfile.ZipFile(wheels[0]).namelist()
+          missing = [w for w in ('octic_telemetry/py.typed',) if w not in names]
+          if not any(n.endswith('licenses/LICENSE') for n in names):
+              missing.append('dist-info/licenses/LICENSE')
+          if missing:
+              sys.exit(f'{wheels[0]} is missing {missing}')
+
+          print(f'{wheels[0]}: py.typed and LICENSE present')
+          PY
+
+      # Kept even though this workflow publishes, so a run that fails at the
+      # upload still leaves something installable to inspect.
+      - name: Upload the distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: octic-telemetry-dist
+          path: python/dist/
+          if-no-files-found: error
+
+      # No password and no API token: authentication is the OIDC token minted
+      # from the permission above.
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist

@@ -140,13 +140,39 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
 
 ## Tooling
 
-- [x] **Add the PyPI pending publisher.** Done — `octic-telemetry`, repository
-      `OcticHQ/telemetry`, workflow `_publish-python.yml`, environment `pypi`.
-      PyPI has no way to reserve a name, so a *pending publisher* both claims
-      the name and configures the OIDC trust; the first successful upload
-      converts it to an ordinary trusted publisher, which is the state to
-      expect afterwards. Note the workflow it names is the **reusable** one
-      that runs the upload, not the `ci.yml` that calls it.
+- [ ] **Point the PyPI publisher at `publish-python.yml`.** The pending
+      publisher exists — `octic-telemetry`, repository `OcticHQ/telemetry`,
+      environment `pypi` — but it still names `_publish-python.yml`, which no
+      longer exists. Until the workflow name is edited on pypi.org the upload is
+      not authorised. PyPI has no way to reserve a name, so a pending publisher
+      both claims the name and configures the trust; the first successful upload
+      converts it to an ordinary trusted publisher.
+- [ ] **`release-please-config.json` asks for `separator`, which is not a key.**
+      The option is **`tag-separator`**, and the schema the file itself points at
+      sets `additionalProperties: false`, so `"separator": "/"` is simply
+      ignored. Every tag cut so far is therefore release-please's default
+      hyphen form — `contract-v0.1.0-beta.0`, `node-v0.1.0-beta.0`,
+      `python-v0.1.0` — while [AGENTS.md](../AGENTS.md) documents
+      `<component>/vX.Y.Z` and says so on the grounds that Go's multi-module
+      support requires it. **That claim is the reason this matters**: `go/vX.Y.Z`
+      is not optional for a Go module, so the separator has to be fixed before
+      the Go SDK is tagged, or the convention has to change and AGENTS.md with
+      it.
+
+      Renaming the key makes future tags slash-form and leaves the three
+      existing ones hyphenated. Worth checking that release-please still locates
+      the previous release across the change — manifest mode reads versions from
+      `.release-please-manifest.json` rather than from tags, so it should, but
+      the next Release PR after the change is the one to read carefully.
+      `publish-python.yml` matches both forms already, so it does not care.
+- [ ] **`_publish-node.yml` has the same latent defect.** It publishes with
+      `--provenance` from a reusable workflow called by `ci.yml`, which is what
+      PyPI rejected for Python: the OIDC token names the reusable file and the
+      attestation names the caller, so a registry checking both cannot match
+      one publisher. It is not reachable today because `npm: false`. Restructure
+      it the way `publish-python.yml` is — top-level, triggered by `node/v*` —
+      before flipping that switch, or the first public npm publish fails after
+      the tag is already cut.
 - [ ] **Revisit release-please at 1.0.**
       [ADR 0002](adr/0002-per-sdk-versioning.md) chose it partly for the 0.x
       mode, which stops mattering at 1.0. The tag namespace is portable to

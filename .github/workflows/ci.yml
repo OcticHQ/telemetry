@@ -123,17 +123,7 @@ jobs:
       packages: write
       id-token: write
 
-  publish-python:
-    name: Publish Python
-    needs: release-please
-    if: needs.release-please.outputs.python-released == 'true'
-    uses: ./.github/workflows/_publish-python.yml
-    with:
-      # THE SWITCH, as above. The wheel is always built and uploaded as an
-      # artifact; PyPI only when this is true. Turning it off does not unpublish
-      # anything — a PyPI version can never be replaced or reused, and yanking
-      # one does not free the number.
-      pypi: true
-    permissions:
-      contents: read
-      id-token: write
+  # There is no publish-python job here. PyPI's Trusted Publishing does not
+  # support reusable workflows — the OIDC token and the attestation name
+  # different workflow files — so the Python publish is its own top-level
+  # workflow, publish-python.yml, triggered by the tag this job cuts.
