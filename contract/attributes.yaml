@@ -96,8 +96,8 @@ groups:
         enum:
           - value: octic-node
             brief: The Node SDK, `@octichq/telemetry`.
-          - value: octic-python
-            brief: The Python SDK, `octic-telemetry`.
+          - value: octichq-airlock-sdk
+            brief: The Python SDK, `octichq-airlock-sdk`.
         brief: >-
           Which of our SDKs produced this. `telemetry.sdk.*` is reserved for the
           OpenTelemetry SDK itself and would be a lie here.
