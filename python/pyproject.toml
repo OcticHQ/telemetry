@@ -7,7 +7,7 @@ name = "octichq-airlock-sdk"
 # Owned by release-please once `python` is registered as a component. Until
 # then this is deliberately 0.0.0: an unreleased build should not claim a
 # version number that identifies a release it is not.
-version = "0.1.0"
+version = "0.2.0"
 description = "Agent telemetry for Octic — OpenTelemetry spans, stamped with the Octic attribute contract"
 readme = "README.md"
 requires-python = ">=3.10"

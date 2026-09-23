@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/OcticHQ/telemetry/compare/python-v0.1.0...python-v0.2.0) (2026-09-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* **python:** install `octichq-airlock-sdk` instead of `octic-telemetry`, and replace `from octic_telemetry import ...` with `from octichq_airlock_sdk import ...`.
+
+### Features
+
+* **python:** rename to octichq-airlock-sdk ([ba372e4](https://github.com/OcticHQ/telemetry/commit/ba372e487f1eb045fa8c6c5f0cbec7bc31da50f8))
+
 ## 0.1.0 (2026-09-22)
 
 
