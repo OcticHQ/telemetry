@@ -8,7 +8,7 @@ import pytest
 from opentelemetry import trace
 
 from conftest import Harness, attrs
-from octic_telemetry import (
+from octichq_airlock_sdk import (
     ATTR,
     CUSTOMER_ATTRIBUTE_PREFIX,
     RESERVED_ATTRIBUTE_PREFIX,

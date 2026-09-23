@@ -1,7 +1,7 @@
 """The SDK's view of the attribute contract.
 
 The names are not written here. They live in ``contract/attributes.yaml`` and
-arrive as :mod:`octic_telemetry.attributes_gen`, because a Python file cannot be
+arrive as :mod:`octichq_airlock_sdk.attributes_gen`, because a Python file cannot be
 the specification for the Node and Go ports either — and because four
 hand-maintained copies of one list is how two sides of the same policy come to
 disagree about how many keys it covers.
@@ -79,7 +79,7 @@ from .attributes_gen import (
     OCTIC_CONTENT_CAPTURE_VALUES,
     OCTIC_SCHEMA_VERSION,
     OCTIC_SDK_NAME_VALUE_OCTIC_NODE,
-    OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON,
+    OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK,
     OCTIC_SDK_NAME_VALUES,
     OCTIC_TARGET_TYPE_VALUES,
     RESERVED_ATTRIBUTE_PREFIX,
@@ -176,8 +176,8 @@ __all__ = [
     "OCTIC_CONTENT_CAPTURE_VALUE_NONE",
     "OCTIC_SCHEMA_VERSION",
     "OCTIC_SDK_NAME_VALUES",
+    "OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK",
     "OCTIC_SDK_NAME_VALUE_OCTIC_NODE",
-    "OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON",
     "OCTIC_TARGET_TYPE_VALUES",
     "RESERVED_ATTRIBUTE_PREFIX",
     "RESOURCE_DENY",

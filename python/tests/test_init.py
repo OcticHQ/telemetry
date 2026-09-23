@@ -19,8 +19,8 @@ from pathlib import Path
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
 
-import octic_telemetry.pipeline as init_module
-from octic_telemetry import (
+import octichq_airlock_sdk.pipeline as init_module
+from octichq_airlock_sdk import (
     ATTR,
     Agent,
     ContentOptions,
@@ -29,8 +29,8 @@ from octic_telemetry import (
     init_with_external_provider,
     silence_watch,
 )
-from octic_telemetry.content import active_policy, resolve_policy, set_active_policy
-from octic_telemetry.spool import SEGMENT_SUFFIX
+from octichq_airlock_sdk.content import active_policy, resolve_policy, set_active_policy
+from octichq_airlock_sdk.spool import SEGMENT_SUFFIX
 
 
 @pytest.fixture(autouse=True)
@@ -79,7 +79,7 @@ def test_external_parts_write_an_enriched_segment(tmp_path: Path) -> None:
     stamped = {entry["key"]: entry["value"] for entry in span["attributes"]}
 
     # The resource is the host's, so provenance has to ride on the span.
-    assert stamped[ATTR.OCTIC_SDK_NAME] == {"stringValue": "octic-python"}
+    assert stamped[ATTR.OCTIC_SDK_NAME] == {"stringValue": "octichq-airlock-sdk"}
     assert stamped[ATTR.DEPLOYMENT_ENVIRONMENT_NAME] == {"stringValue": "staging"}
     assert stamped[ATTR.GEN_AI_AGENT_ID] == {"stringValue": "loan-agent"}
     assert telemetry.spool is not None
@@ -109,7 +109,7 @@ def test_init_degrades_when_another_sdk_owns_the_provider(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """conftest registered a provider already — the case a host SDK creates."""
-    with caplog.at_level(logging.WARNING, logger="octic_telemetry"):
+    with caplog.at_level(logging.WARNING, logger="octichq_airlock_sdk"):
         telemetry = init(**options(tmp_path / "spool"))  # type: ignore[arg-type]
 
     assert "another SDK already registered" in caplog.text
@@ -163,7 +163,7 @@ _OWN_PROVIDER = textwrap.dedent(
     import json, logging, sys
     logging.basicConfig(level=logging.WARNING, stream=sys.stderr)
 
-    from octic_telemetry import SpoolOptions, init, with_workflow
+    from octichq_airlock_sdk import SpoolOptions, init, with_workflow
 
     spool = SpoolOptions(dir=sys.argv[1], fsync=False)
     telemetry = init(service_name="svc", endpoint="https://ingest.example.test", spool=spool)
@@ -202,7 +202,7 @@ def test_init_registers_a_provider_that_writes_the_spool(tmp_path: Path) -> None
     [resource_spans] = json.loads(segment.read_bytes())["resourceSpans"]
     resource = {entry["key"]: entry["value"] for entry in resource_spans["resource"]["attributes"]}
     assert resource[ATTR.SERVICE_NAME] == {"stringValue": "svc"}
-    assert resource[ATTR.OCTIC_SDK_NAME] == {"stringValue": "octic-python"}
+    assert resource[ATTR.OCTIC_SDK_NAME] == {"stringValue": "octichq-airlock-sdk"}
     assert ATTR.OCTIC_SCHEMA_VERSION in resource
     assert ATTR.OCTIC_SDK_VERSION in resource
 

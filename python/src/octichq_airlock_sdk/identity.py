@@ -7,7 +7,7 @@ stamped onto spans as attributes, with conversation membership resolved by query
 later.
 
 Under the governance framing these are filters rather than the headline — the
-primary key is the agent, see :mod:`octic_telemetry.agent`. They stay optional
+primary key is the agent, see :mod:`octichq_airlock_sdk.agent`. They stay optional
 and they stay here, because "what did this customer experience and what did it
 cost" is not answerable after the fact if nobody recorded it at the time.
 

@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from conftest import Harness, attrs
-from octic_telemetry import ATTR, with_identity
-from octic_telemetry.counters import reset_counters, snapshot
-from octic_telemetry.sanitize import MAX_ATTRIBUTES, MAX_KEY_LENGTH, sanitize_attributes
+from octichq_airlock_sdk import ATTR, with_identity
+from octichq_airlock_sdk.counters import reset_counters, snapshot
+from octichq_airlock_sdk.sanitize import MAX_ATTRIBUTES, MAX_KEY_LENGTH, sanitize_attributes
 
 
 @pytest.mark.parametrize(

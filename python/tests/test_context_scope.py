@@ -6,7 +6,7 @@ import asyncio
 
 from opentelemetry import context as context_api
 
-from octic_telemetry.context_scope import ContextScope
+from octichq_airlock_sdk.context_scope import ContextScope
 
 merging = ContextScope[dict[str, int]](
     key="test.merging",

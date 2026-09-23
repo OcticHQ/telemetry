@@ -10,7 +10,7 @@ import pytest
 from opentelemetry import trace
 
 from conftest import Harness, attrs, build
-from octic_telemetry import (
+from octichq_airlock_sdk import (
     ATTR,
     ContentOptions,
     OcticSpanProcessor,
@@ -18,7 +18,7 @@ from octic_telemetry import (
     with_tool,
     with_workflow,
 )
-from octic_telemetry.content import record_span_capture, span_capture_for
+from octichq_airlock_sdk.content import record_span_capture, span_capture_for
 
 
 def test_a_customers_exception_reaches_them_unchanged(harness: Harness) -> None:
@@ -93,7 +93,7 @@ def test_exporting_an_empty_batch_is_fine(harness: Harness) -> None:
     from opentelemetry.sdk.trace.export import SpanExportResult
     from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-    from octic_telemetry import RedactingSpanExporter, resolve_policy
+    from octichq_airlock_sdk import RedactingSpanExporter, resolve_policy
 
     exporter = RedactingSpanExporter(InMemorySpanExporter(), resolve_policy())
     assert exporter.export([]) is SpanExportResult.SUCCESS
@@ -107,7 +107,7 @@ def test_a_raising_processor_behind_the_guard_cannot_break_a_span() -> None:
     """
     from opentelemetry.sdk.trace import TracerProvider
 
-    from octic_telemetry.safe_processor import SafeSpanProcessor
+    from octichq_airlock_sdk.safe_processor import SafeSpanProcessor
 
     class Exploding(OcticSpanProcessor):
         def on_start(self, span: object, parent_context: object = None) -> None:

@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from octic_telemetry.spool import (
+from octichq_airlock_sdk.spool import (
     DISABLE_BACKOFF_SECONDS,
     SEGMENT_SUFFIX,
     SPOOL_FORMAT_VERSION,
@@ -32,7 +32,7 @@ MANIFEST = ManifestInput(
     endpoint="https://ingest.example.test/",
     service_name="svc",
     octic_schema_version="1",
-    sdk_name="octic-python",
+    sdk_name="octichq-airlock-sdk",
     sdk_version="0.0.0",
     content_capture="full",
 )
@@ -127,7 +127,7 @@ def test_the_manifest_carries_exactly_the_documented_fields(tmp_path: Path) -> N
     assert manifest["signalPaths"] == {"traces": "/v1/traces", "logs": "/v1/logs"}
     assert manifest["contentType"] == "application/json"
     assert manifest["contentEncoding"] == "identity"
-    assert manifest["sdkName"] == "octic-python"
+    assert manifest["sdkName"] == "octichq-airlock-sdk"
     assert manifest["createdAt"].endswith("Z")
 
 

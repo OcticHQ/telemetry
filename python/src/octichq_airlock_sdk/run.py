@@ -7,7 +7,7 @@ closed — keys off. So the id has to be ours to mint.
 
 It lives in its own scope, separate from the annotation that sets it, because the
 workflow annotation writes it and the processor reads it; putting it in
-:mod:`octic_telemetry.annotations` would make the two import each other.
+:mod:`octichq_airlock_sdk.annotations` would make the two import each other.
 
 Scoping it rather than only stamping the workflow span is what lets a consumer
 attribute any span to its run without walking the parent chain.

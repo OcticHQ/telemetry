@@ -13,7 +13,7 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import Status, StatusCode
 
 from conftest import Harness, attrs, build
-from octic_telemetry import (
+from octichq_airlock_sdk import (
     ATTR,
     OCTIC_SDK_NAME_VALUES,
     ContentOptions,
@@ -21,8 +21,8 @@ from octic_telemetry import (
     resolve_policy,
     with_tool,
 )
-from octic_telemetry.counters import reset_counters, snapshot
-from octic_telemetry.redacting_exporter import _OUR_SCOPES
+from octichq_airlock_sdk.counters import reset_counters, snapshot
+from octichq_airlock_sdk.redacting_exporter import _OUR_SCOPES
 
 SECRET = "the customer asked about their balance"
 

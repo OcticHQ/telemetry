@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from conftest import Harness, attrs
-from octic_telemetry import (
+from octichq_airlock_sdk import (
     ATTR,
     GEN_AI_OPERATION_NAME_VALUE_EXECUTE_TOOL,
     GEN_AI_OPERATION_NAME_VALUE_INVOKE_WORKFLOW,
@@ -19,8 +19,8 @@ from octic_telemetry import (
     with_tool,
     with_workflow,
 )
-from octic_telemetry.annotations import TRACER_NAME, TRACER_VERSION
-from octic_telemetry.version import SDK_NAME, SDK_VERSION
+from octichq_airlock_sdk.annotations import TRACER_NAME, TRACER_VERSION
+from octichq_airlock_sdk.version import SDK_NAME, SDK_VERSION
 
 
 def test_the_tracer_scope_is_the_sdk_pair() -> None:

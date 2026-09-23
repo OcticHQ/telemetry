@@ -1,4 +1,4 @@
-# `octic-telemetry`
+# `octichq-airlock-sdk`
 
 Agent telemetry for [Octic](https://octic.ai) — OpenTelemetry spans, stamped
 with the Octic attribute contract.
@@ -27,7 +27,7 @@ instrumentation, whichever you chose, comes out carrying your identity.
 ## Install
 
 ```bash
-pip install octic-telemetry
+pip install octichq-airlock-sdk
 ```
 
 `opentelemetry-api` and `opentelemetry-sdk` come with it, and exactly one copy
@@ -39,7 +39,7 @@ managers, and the stamping silently stops working.
 Once per process, before the libraries you want observed are imported:
 
 ```python
-from octic_telemetry import Agent, init
+from octichq_airlock_sdk import Agent, init
 
 telemetry = init(
     service_name="checkout-agent",
@@ -54,7 +54,7 @@ telemetry = init(
 Then annotate what only your application knows:
 
 ```python
-from octic_telemetry import with_identity, with_prompt, with_tool, with_workflow
+from octichq_airlock_sdk import with_identity, with_prompt, with_tool, with_workflow
 
 with with_identity(conversation_id=conversation_id, user_id=user_id):
     with with_workflow(name="refund-request", input=message) as run:

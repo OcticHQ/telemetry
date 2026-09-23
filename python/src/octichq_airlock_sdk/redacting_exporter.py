@@ -8,7 +8,7 @@ copy.
 The second reason is the decisive one. When a host SDK owns the tracer provider
 the processor list is theirs to arrange; the exporter is the one surface that is
 still ours in both entry modes. One implementation covers both, and
-:class:`~octic_telemetry.processor.OcticSpanProcessor` stays enrichment-only.
+:class:`~octichq_airlock_sdk.processor.OcticSpanProcessor` stays enrichment-only.
 """
 
 from __future__ import annotations
@@ -172,7 +172,7 @@ class RedactingSpanExporter(SpanExporter):
                 sanitized.append(self._sanitize(span))
             except Exception as error:  # noqa: BLE001 - one bad span must not cost the batch
                 debug(
-                    "octic-telemetry: a span could not be sanitized (%s); sending it stripped",
+                    "octichq-airlock-sdk: a span could not be sanitized (%s); sending it stripped",
                     type(error).__name__,
                 )
                 try:

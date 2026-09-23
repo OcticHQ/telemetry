@@ -12,7 +12,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from octic_telemetry import silence_watch
+from octichq_airlock_sdk import silence_watch
 
 DELAY = 0.05
 

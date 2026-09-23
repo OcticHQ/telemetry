@@ -46,7 +46,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 #: Bumped when the on-disk shape changes in a way a reader must notice.
 SPOOL_FORMAT_VERSION = 1
@@ -307,7 +307,7 @@ class Spool:
             except Exception:
                 # Every path below already catches what it expects. This is the
                 # one for what nobody expected, and the host still does not see it.
-                log.warning("octic-telemetry: spool write failed unexpectedly", exc_info=True)
+                log.warning("octichq-airlock-sdk: spool write failed unexpectedly", exc_info=True)
                 self._failures += 1
                 return False
 
@@ -391,12 +391,12 @@ class Spool:
 
             self._dir = candidate
             self._resolved = True
-            log.info("octic-telemetry: spooling telemetry to %s", candidate)
+            log.info("octichq-airlock-sdk: spooling telemetry to %s", candidate)
             return candidate
 
         self._resolved = True
         log.warning(
-            "octic-telemetry: no usable spool directory (tried %s); telemetry will be "
+            "octichq-airlock-sdk: no usable spool directory (tried %s); telemetry will be "
             "dropped until one is. Retrying in %ds.",
             ", ".join(str(candidate) for candidate in candidates),
             int(DISABLE_BACKOFF_SECONDS),
@@ -407,7 +407,7 @@ class Spool:
     def _note_failure(self, error: OSError, what: str) -> None:
         if error.errno in _FATAL_ERRNOS:
             log.warning(
-                "octic-telemetry: spool %s failed with %s; pausing for %ds.",
+                "octichq-airlock-sdk: spool %s failed with %s; pausing for %ds.",
                 what,
                 errno.errorcode.get(error.errno or 0, str(error.errno)),
                 int(DISABLE_BACKOFF_SECONDS),
@@ -476,7 +476,7 @@ class Spool:
         self._bytes_on_disk += len(body)
         if not self._announced:
             self._announced = True
-            log.info("octic-telemetry: first spooled batch written to %s", final)
+            log.info("octichq-airlock-sdk: first spooled batch written to %s", final)
         return True
 
     def _list_segments(self, directory: Path) -> list[tuple[Path, int, float]]:
@@ -580,7 +580,7 @@ class Spool:
         if self._evicted > 0 and not self._announced_eviction:
             self._announced_eviction = True
             log.warning(
-                "octic-telemetry: spool at %s is full; deleting the oldest undelivered "
+                "octichq-airlock-sdk: spool at %s is full; deleting the oldest undelivered "
                 "batches. Is the spool reader running?",
                 directory,
             )

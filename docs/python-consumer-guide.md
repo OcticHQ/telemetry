@@ -8,7 +8,7 @@ Three steps: install, initialize, annotate.
 ## 1. Install
 
 ```bash
-pip install octic-telemetry
+pip install octichq-airlock-sdk
 ```
 
 Python 3.10 or newer.
@@ -19,7 +19,7 @@ Once, at the top of your entry point — before you import the libraries you wan
 observed.
 
 ```python
-from octic_telemetry import Agent, init
+from octichq_airlock_sdk import Agent, init
 
 telemetry = init(
     service_name="checkout-agent",
@@ -43,7 +43,7 @@ Wrap the work you want to see. Everything inside a wrapper — including calls
 made by libraries that know nothing about Octic — is tagged automatically.
 
 ```python
-from octic_telemetry import with_identity, with_workflow, with_tool
+from octichq_airlock_sdk import with_identity, with_workflow, with_tool
 
 with with_identity(conversation_id=conversation_id, user_id=user_id):
     with with_workflow(name="refund-request", input=message) as run:
@@ -130,7 +130,7 @@ If you do want the text — for debugging, or for evaluating output quality — 
 it on:
 
 ```python
-from octic_telemetry import ContentOptions, init
+from octichq_airlock_sdk import ContentOptions, init
 
 init(
     service_name="checkout-agent",
@@ -173,7 +173,7 @@ directory under your home or temp directory.
 To choose it yourself:
 
 ```python
-from octic_telemetry import SpoolOptions, init
+from octichq_airlock_sdk import SpoolOptions, init
 
 init(
     service_name="checkout-agent",

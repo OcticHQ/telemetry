@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from dataclasses import fields
 
-from octic_telemetry import ATTR, OCTIC_SDK_NAME_VALUES
-from octic_telemetry import attributes_gen as gen
-from octic_telemetry.annotations import TRACER_NAME
-from octic_telemetry.attributes import _Attr
-from octic_telemetry.version import SDK_NAME
+from octichq_airlock_sdk import ATTR, OCTIC_SDK_NAME_VALUES
+from octichq_airlock_sdk import attributes_gen as gen
+from octichq_airlock_sdk.annotations import TRACER_NAME
+from octichq_airlock_sdk.attributes import _Attr
+from octichq_airlock_sdk.version import SDK_NAME
 
 
 def test_every_attr_member_is_the_generated_constant() -> None:
@@ -25,7 +25,7 @@ def test_attr_covers_every_generated_key() -> None:
 
 
 def test_this_sdk_names_itself_from_the_contract_enum() -> None:
-    assert SDK_NAME == gen.OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON
+    assert SDK_NAME == gen.OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK
     assert SDK_NAME in OCTIC_SDK_NAME_VALUES
 
 

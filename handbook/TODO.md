@@ -140,13 +140,20 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
 
 ## Tooling
 
-- [ ] **Point the PyPI publisher at `publish-python.yml`.** The pending
-      publisher exists — `octic-telemetry`, repository `OcticHQ/telemetry`,
-      environment `pypi` — but it still names `_publish-python.yml`, which no
-      longer exists. Until the workflow name is edited on pypi.org the upload is
-      not authorised. PyPI has no way to reserve a name, so a pending publisher
-      both claims the name and configures the trust; the first successful upload
-      converts it to an ordinary trusted publisher.
+- [ ] **Add a PyPI pending publisher for `octichq-airlock-sdk`.** The Python
+      SDK was renamed from `octic-telemetry`, and a trusted publisher is bound
+      to a project name, so the old one does not carry over. On pypi.org add a
+      pending publisher — project `octichq-airlock-sdk`, repository
+      `OcticHQ/telemetry`, workflow `publish-python.yml`, environment `pypi`.
+      Until then the upload is not authorised. PyPI has no way to reserve a
+      name, so a pending publisher both claims the name and configures the
+      trust; the first successful upload converts it to an ordinary trusted
+      publisher.
+- [ ] **Point `octic-telemetry` 0.1.0 users at the new name.** It stays on
+      PyPI (a release cannot be reused, and deleting it breaks pinned installs).
+      Once `octichq-airlock-sdk` is published, mark the old project as
+      deprecated on pypi.org, or push a final `octic-telemetry` whose README
+      says where the package went.
 - [ ] **`release-please-config.json` asks for `separator`, which is not a key.**
       The option is **`tag-separator`**, and the schema the file itself points at
       sets `additionalProperties: false`, so `"separator": "/"` is simply

@@ -25,12 +25,12 @@ from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 
 from .counters import count
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 
 def _swallow(where: str) -> None:
     count("processor_errors")
-    log.warning("octic-telemetry: %s failed and was suppressed", where, exc_info=True)
+    log.warning("octichq-airlock-sdk: %s failed and was suppressed", where, exc_info=True)
 
 
 class SafeSpanProcessor(SpanProcessor):

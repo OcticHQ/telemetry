@@ -21,8 +21,8 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import Link, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from opentelemetry.trace.span import TraceState
 
-from octic_telemetry import encode_spans
-from octic_telemetry.otlp_json import _any_value
+from octichq_airlock_sdk import encode_spans
+from octichq_airlock_sdk.otlp_json import _any_value
 
 HEX32 = re.compile(r"^[0-9a-f]{32}$")
 HEX16 = re.compile(r"^[0-9a-f]{16}$")

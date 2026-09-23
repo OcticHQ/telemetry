@@ -57,7 +57,7 @@ from .spool import ManifestInput, Spool, SpoolOptions, SpoolStats
 from .spool_exporter import SpoolingSpanExporter
 from .version import SDK_NAME, SDK_VERSION
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 #: Where the reader delivers, recorded in the spool manifest.
 #:
@@ -237,7 +237,7 @@ class Telemetry:
         try:
             return bool(self._flush_target.force_flush(timeout_millis))
         except Exception:
-            log.warning("octic-telemetry: flushing did not complete cleanly", exc_info=True)
+            log.warning("octichq-airlock-sdk: flushing did not complete cleanly", exc_info=True)
             return False
 
     def shutdown(self) -> None:
@@ -280,7 +280,7 @@ class ExternalProviderTelemetry:
         try:
             return bool(self._flush_target.force_flush(timeout_millis))
         except Exception:
-            log.warning("octic-telemetry: flushing did not complete cleanly", exc_info=True)
+            log.warning("octichq-airlock-sdk: flushing did not complete cleanly", exc_info=True)
             return False
 
     def shutdown(self) -> None:
@@ -333,7 +333,7 @@ def _shutdown_once(target: SpanProcessor | TracerProvider | None) -> None:
         try:
             target.shutdown()
         except Exception:
-            log.warning("octic-telemetry: shutdown did not complete cleanly", exc_info=True)
+            log.warning("octichq-airlock-sdk: shutdown did not complete cleanly", exc_info=True)
 
 
 def _flush_target(state: _State) -> SpanProcessor | TracerProvider | None:
@@ -399,14 +399,14 @@ def _already_initialized(state: _State, wanted: _StateKind) -> None:
     """Warns about a second call. The caller then hands back what the first built."""
     if state.kind == "failed":
         log.warning(
-            "octic-telemetry: a previous init() failed; returning the same inert handle "
+            "octichq-airlock-sdk: a previous init() failed; returning the same inert handle "
             "rather than retrying. Set OCTIC_TELEMETRY_DEBUG=1 to see the original failure."
         )
     elif state.kind == wanted:
-        log.warning("octic-telemetry: already initialized; returning the existing handle.")
+        log.warning("octichq-airlock-sdk: already initialized; returning the existing handle.")
     else:
         log.warning(
-            'octic-telemetry: already initialized in "%s" mode; ignoring this "%s" call and '
+            'octichq-airlock-sdk: already initialized in "%s" mode; ignoring this "%s" call and '
             "reusing the existing pipeline. Per-span provenance may be missing.",
             state.kind,
             wanted,
@@ -459,7 +459,7 @@ def init(
             # failure this package exists to remove.
             if not isinstance(trace.get_tracer_provider(), trace.ProxyTracerProvider):
                 log.warning(
-                    "octic-telemetry: another SDK already registered the global tracer "
+                    "octichq-airlock-sdk: another SDK already registered the global tracer "
                     "provider, so init() cannot. Use init_with_external_provider() and hand "
                     "its processors to that SDK instead."
                 )
@@ -475,7 +475,7 @@ def init(
             _state = _State(kind="own", parts=parts, provider=provider)
         except Exception:
             log.error(
-                "octic-telemetry: init() failed; telemetry is disabled for this process",
+                "octichq-airlock-sdk: init() failed; telemetry is disabled for this process",
                 exc_info=True,
             )
             _state = _State(kind="failed" if parts is None else "degraded", parts=parts)
@@ -519,7 +519,7 @@ def init_with_external_provider(
             )
         except Exception:
             log.error(
-                "octic-telemetry: init_with_external_provider() failed; telemetry is "
+                "octichq-airlock-sdk: init_with_external_provider() failed; telemetry is "
                 "disabled for this process",
                 exc_info=True,
             )

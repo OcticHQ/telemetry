@@ -25,7 +25,7 @@ the data afterwards.
 | SDK | Package | Tag | Status |
 |---|---|---|---|
 | [Node](node) | `@octichq/telemetry` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
-| [Python](python) | `octic-telemetry` (PyPI) | `python/vX.Y.Z` | landed — spool-only, unreleased |
+| [Python](python) | `octichq-airlock-sdk` (PyPI) | `python/vX.Y.Z` | landed — spool-only, unreleased |
 | Go | `github.com/OcticHQ/telemetry/go` | `go/vX.Y.Z` | planned |
 
 Every SDK versions independently. `node` at `2.x` while `python` is at `0.1.0`
