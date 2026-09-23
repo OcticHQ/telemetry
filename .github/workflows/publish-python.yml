@@ -1,4 +1,4 @@
-# Publish octic-telemetry to PyPI.
+# Publish octichq-airlock-sdk to PyPI.
 #
 # **Top-level on purpose.** This was a reusable workflow called from ci.yml, and
 # PyPI rejected the upload: a reusable workflow produces an OIDC token whose
@@ -103,7 +103,7 @@ jobs:
           TARGET_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           tag_version="$(printf '%s' "$TARGET_TAG" | sed -E 's|^python[-/]v||')"
-          built="$(ls dist/*.tar.gz | sed -E 's|.*/octic_telemetry-(.*)\.tar\.gz|\1|')"
+          built="$(ls dist/*.tar.gz | sed -E 's|.*/octichq_airlock_sdk-(.*)\.tar\.gz|\1|')"
           if [ "$tag_version" != "$built" ]; then
             echo "::error::$TARGET_TAG says $tag_version, built $built"
             exit 1
@@ -122,7 +122,7 @@ jobs:
               sys.exit(f'expected exactly one wheel, found {wheels}')
 
           names = zipfile.ZipFile(wheels[0]).namelist()
-          missing = [w for w in ('octic_telemetry/py.typed',) if w not in names]
+          missing = [w for w in ('octichq_airlock_sdk/py.typed',) if w not in names]
           if not any(n.endswith('licenses/LICENSE') for n in names):
               missing.append('dist-info/licenses/LICENSE')
           if missing:
@@ -136,7 +136,7 @@ jobs:
       - name: Upload the distributions
         uses: actions/upload-artifact@v4
         with:
-          name: octic-telemetry-dist
+          name: octichq-airlock-sdk-dist
           path: python/dist/
           if-no-files-found: error
 

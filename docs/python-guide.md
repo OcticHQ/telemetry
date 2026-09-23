@@ -19,7 +19,7 @@ created through the tracer provider.
 ## Install
 
 ```bash
-pip install octic-telemetry
+pip install octichq-airlock-sdk
 ```
 
 Python 3.10 or newer. The only runtime dependencies are `opentelemetry-api` and
@@ -31,7 +31,7 @@ instrumentation.
 Once per process, before the libraries you want observed are imported:
 
 ```python
-from octic_telemetry import Agent, init
+from octichq_airlock_sdk import Agent, init
 
 telemetry = init(
     service_name="checkout-agent",
@@ -108,7 +108,7 @@ print(telemetry.spool.stats())       # written, bytes, dropped, evicted, failure
 ### Bounds
 
 ```python
-from octic_telemetry import SpoolOptions, init
+from octichq_airlock_sdk import SpoolOptions, init
 
 init(
     service_name="checkout-agent",
@@ -142,7 +142,7 @@ managers rather than decorators on your call sites.
 Each returns a binding usable as `with` or `async with`.
 
 ```python
-from octic_telemetry import with_identity, with_prompt
+from octichq_airlock_sdk import with_identity, with_prompt
 
 with with_identity(conversation_id=conversation_id, user_id=user_id):
     with with_prompt(template="refund-triage", version="3"):
@@ -174,7 +174,7 @@ structural: without the split, a tenant key could overwrite `octic.run.id`.
 ### Reading the current values
 
 ```python
-from octic_telemetry import current_identity, current_run_id, current_capture
+from octichq_airlock_sdk import current_identity, current_run_id, current_capture
 ```
 
 For code that needs to correlate outside a span — a log line, a response body.
@@ -192,7 +192,7 @@ Where a scope adds context to spans that already exist, an annotation **creates*
 a span: a unit of work you want to see as a unit.
 
 ```python
-from octic_telemetry import with_retrieval, with_tool, with_workflow
+from octichq_airlock_sdk import with_retrieval, with_tool, with_workflow
 ```
 
 | Annotation | Signature | Creates |
@@ -256,7 +256,7 @@ send it.
 ### Targets are what make the graph join
 
 ```python
-from octic_telemetry import Target, with_tool
+from octichq_airlock_sdk import Target, with_tool
 
 with with_tool(
     name="lookup_order",
@@ -290,7 +290,7 @@ latencies and the asset references all survive with content switched off. You
 lose the ability to read what was said, and nothing else.
 
 ```python
-from octic_telemetry import ContentOptions, init
+from octichq_airlock_sdk import ContentOptions, init
 
 init(
     service_name="checkout-agent",
@@ -302,7 +302,7 @@ Per run, on the same context mechanism as identity — so the override reaches
 foreign spans too:
 
 ```python
-from octic_telemetry import with_content
+from octichq_airlock_sdk import with_content
 
 with with_content("metadata"):
     ...
@@ -413,7 +413,7 @@ If something else owns the tracer provider — a framework, a vendor SDK — han
 the parts instead:
 
 ```python
-from octic_telemetry import init_with_external_provider
+from octichq_airlock_sdk import init_with_external_provider
 
 telemetry = init_with_external_provider(
     service_name="checkout-agent",

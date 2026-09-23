@@ -23,7 +23,7 @@ from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from . import silence_watch
 from .counters import count
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 
 class SafeSpanExporter(SpanExporter):
@@ -34,7 +34,7 @@ class SafeSpanExporter(SpanExporter):
         try:
             result = self._inner.export(spans)
         except Exception:
-            log.warning("octic-telemetry: traces export raised", exc_info=True)
+            log.warning("octichq-airlock-sdk: traces export raised", exc_info=True)
             result = SpanExportResult.FAILURE
 
         if result is SpanExportResult.SUCCESS:
@@ -46,18 +46,20 @@ class SafeSpanExporter(SpanExporter):
             silence_watch.note_export_succeeded()
         else:
             count("exports_failed")
-            log.warning("octic-telemetry: a traces batch of %d spans was not accepted", len(spans))
+            log.warning(
+                "octichq-airlock-sdk: a traces batch of %d spans was not accepted", len(spans)
+            )
         return result
 
     def shutdown(self) -> None:
         try:
             self._inner.shutdown()
         except Exception:
-            log.warning("octic-telemetry: traces exporter shutdown failed", exc_info=True)
+            log.warning("octichq-airlock-sdk: traces exporter shutdown failed", exc_info=True)
 
     def force_flush(self, timeout_millis: int = 30_000) -> bool:
         try:
             return self._inner.force_flush(timeout_millis)
         except Exception:
-            log.warning("octic-telemetry: traces exporter flush failed", exc_info=True)
+            log.warning("octichq-airlock-sdk: traces exporter flush failed", exc_info=True)
             return False

@@ -102,7 +102,7 @@ def _describe(value: object) -> str:
 
 def _drop(key: str, why: str) -> None:
     count("attributes_dropped")
-    debug("octic-telemetry: dropped attribute %s — %s", key, why)
+    debug("octichq-airlock-sdk: dropped attribute %s — %s", key, why)
 
 
 def sanitize_attributes(source: dict[str, object]) -> tuple[dict[str, AttributeValue], int]:

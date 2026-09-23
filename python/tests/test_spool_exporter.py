@@ -10,12 +10,12 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExportResult
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from octic_telemetry.content import ContentOptions, resolve_policy
-from octic_telemetry.counters import reset_counters, snapshot
-from octic_telemetry.redacting_exporter import RedactingSpanExporter
-from octic_telemetry.safe_exporter import SafeSpanExporter
-from octic_telemetry.spool import SEGMENT_SUFFIX, ManifestInput, Spool, SpoolOptions
-from octic_telemetry.spool_exporter import SpoolingSpanExporter, serialize_spans
+from octichq_airlock_sdk.content import ContentOptions, resolve_policy
+from octichq_airlock_sdk.counters import reset_counters, snapshot
+from octichq_airlock_sdk.redacting_exporter import RedactingSpanExporter
+from octichq_airlock_sdk.safe_exporter import SafeSpanExporter
+from octichq_airlock_sdk.spool import SEGMENT_SUFFIX, ManifestInput, Spool, SpoolOptions
+from octichq_airlock_sdk.spool_exporter import SpoolingSpanExporter, serialize_spans
 
 SECRET = "the customer asked about their balance"
 
@@ -39,7 +39,7 @@ def spool_in(directory: Path, capture: str = "full") -> Spool:
             endpoint="https://ingest.example.test",
             service_name="svc",
             octic_schema_version="1",
-            sdk_name="octic-python",
+            sdk_name="octichq-airlock-sdk",
             sdk_version="0.0.0",
             content_capture=capture,
         ),

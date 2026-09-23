@@ -18,9 +18,9 @@
     "python": {
       "release-type": "python",
       "component": "python",
-      "package-name": "octic-telemetry",
+      "package-name": "octichq-airlock-sdk",
       "changelog-path": "CHANGELOG.md",
-      "extra-files": ["src/octic_telemetry/version.py"]
+      "extra-files": ["src/octichq_airlock_sdk/version.py"]
     },
     "contract": {
       "release-type": "simple",

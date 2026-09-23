@@ -124,7 +124,7 @@ jobs:
           names = zipfile.ZipFile(wheels[0]).namelist()
           missing = [
               want
-              for want in ('octic_telemetry/py.typed',)
+              for want in ('octichq_airlock_sdk/py.typed',)
               if want not in names
           ]
           if not any(n.endswith('licenses/LICENSE') for n in names):

@@ -8,7 +8,7 @@ import pytest
 from opentelemetry import trace
 
 from conftest import Harness, attrs, build
-from octic_telemetry import (
+from octichq_airlock_sdk import (
     ATTR,
     OCTIC_CONTENT_CAPTURE_VALUE_FULL,
     ContentOptions,
@@ -262,7 +262,7 @@ def test_denied_resource_attributes_are_scrubbed(tracer: trace.Tracer) -> None:
     """Some default detectors ship the full argv, which is where secrets live."""
     from opentelemetry.sdk.resources import Resource
 
-    from octic_telemetry.content import is_denied_resource_attribute
+    from octichq_airlock_sdk.content import is_denied_resource_attribute
 
     assert is_denied_resource_attribute("process.command_args")
     assert not is_denied_resource_attribute("service.name")

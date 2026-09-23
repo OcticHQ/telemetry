@@ -29,10 +29,15 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from octic_telemetry.content import ContentOptions, ContentPolicy, resolve_policy, set_active_policy
-from octic_telemetry.counters import reset_counters, snapshot
-from octic_telemetry.processor import OcticSpanProcessor
-from octic_telemetry.redacting_exporter import RedactingSpanExporter
+from octichq_airlock_sdk.content import (
+    ContentOptions,
+    ContentPolicy,
+    resolve_policy,
+    set_active_policy,
+)
+from octichq_airlock_sdk.counters import reset_counters, snapshot
+from octichq_airlock_sdk.processor import OcticSpanProcessor
+from octichq_airlock_sdk.redacting_exporter import RedactingSpanExporter
 
 
 class _Swappable(SpanExporter):

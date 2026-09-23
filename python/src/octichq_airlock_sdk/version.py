@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from .attributes_gen import OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON
+from .attributes_gen import OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK
 
 # Stamped by release-please in the same commit as the `pyproject.toml` bump,
 # once `python` is registered as a component. Reading the installed metadata at
@@ -30,4 +30,4 @@ SDK_VERSION: Final = "0.1.0"  # x-release-please-version
 # `redacting_exporter` decides a span is foreign by comparing its scope against
 # the whole set. Copies of one name across two languages is how that comparison
 # starts failing open.
-SDK_NAME: Final = OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON
+SDK_NAME: Final = OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK

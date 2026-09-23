@@ -57,12 +57,12 @@ why the list lives here and is not restated per language.
 OCTIC_SDK_NAME_VALUE_OCTIC_NODE = "octic-node"
 """The Node SDK, `@octichq/telemetry`."""
 
-OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON = "octic-python"
-"""The Python SDK, `octic-telemetry`."""
+OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK = "octichq-airlock-sdk"
+"""The Python SDK, `octichq-airlock-sdk`."""
 
 OCTIC_SDK_NAME_VALUES: tuple[str, ...] = (
     "octic-node",  # The Node SDK, `@octichq/telemetry`.
-    "octic-python",  # The Python SDK, `octic-telemetry`.
+    "octichq-airlock-sdk",  # The Python SDK, `octichq-airlock-sdk`.
 )
 """Permitted values for `octic.sdk.name`."""
 

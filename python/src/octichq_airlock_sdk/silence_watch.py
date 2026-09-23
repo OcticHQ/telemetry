@@ -25,7 +25,7 @@ from __future__ import annotations
 import logging
 import threading
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 #: Long enough that a batch delay (5s) plus a slow disk does not trip it, short
 #: enough to be visible while somebody is still watching the terminal.
@@ -66,7 +66,7 @@ def _fire() -> None:
         if _delivered:
             return
     log.warning(
-        "octic-telemetry: spans have been produced for %ss and no spool segment has been "
+        "octichq-airlock-sdk: spans have been produced for %ss and no spool segment has been "
         "written. Common causes: under init_with_external_provider(), export_processor was "
         "never added to the host SDK's tracer provider; another SDK registered the global "
         "tracer provider before init(); or the spool directory is unusable (look for an "

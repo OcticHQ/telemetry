@@ -9,9 +9,9 @@ from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, Span, SpanProcessor
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 
-from octic_telemetry.counters import reset_counters, snapshot
-from octic_telemetry.safe_exporter import SafeSpanExporter
-from octic_telemetry.safe_processor import SafeSpanProcessor
+from octichq_airlock_sdk.counters import reset_counters, snapshot
+from octichq_airlock_sdk.safe_exporter import SafeSpanExporter
+from octichq_airlock_sdk.safe_processor import SafeSpanProcessor
 
 
 @pytest.fixture(autouse=True)

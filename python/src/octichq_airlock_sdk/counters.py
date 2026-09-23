@@ -24,7 +24,7 @@ import os
 import threading
 from dataclasses import asdict, dataclass
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 
 @dataclass

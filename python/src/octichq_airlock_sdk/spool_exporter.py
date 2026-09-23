@@ -23,7 +23,7 @@ from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
 from .otlp_json import encode_spans
 from .spool import Spool
 
-log = logging.getLogger("octic_telemetry")
+log = logging.getLogger("octichq_airlock_sdk")
 
 
 def serialize_spans(spans: Sequence[ReadableSpan]) -> bytes:
@@ -50,7 +50,7 @@ class SpoolingSpanExporter(SpanExporter):
         except Exception:
             # A batch the encoder cannot represent is lost; the batches after it
             # are not. Reported as a failure so the counters say so.
-            log.warning("octic-telemetry: could not encode a span batch", exc_info=True)
+            log.warning("octichq-airlock-sdk: could not encode a span batch", exc_info=True)
             return SpanExportResult.FAILURE
         return (
             SpanExportResult.SUCCESS
