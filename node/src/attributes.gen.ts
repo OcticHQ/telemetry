@@ -55,13 +55,13 @@ export const ATTR_OCTIC_SDK_NAME = 'octic.sdk.name';
 /** The Node SDK, `@octichq/telemetry`. */
 export const OCTIC_SDK_NAME_VALUE_OCTIC_NODE = 'octic-node';
 
-/** The Python SDK, `octic-telemetry`. */
-export const OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON = 'octic-python';
+/** The Python SDK, `octichq-airlock-sdk`. */
+export const OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK = 'octichq-airlock-sdk';
 
 /** Permitted values for `octic.sdk.name`. */
 export const OCTIC_SDK_NAME_VALUES = [
   'octic-node', // The Node SDK, `@octichq/telemetry`.
-  'octic-python', // The Python SDK, `octic-telemetry`.
+  'octichq-airlock-sdk', // The Python SDK, `octichq-airlock-sdk`.
 ] as const;
 
 /** Version of the Octic SDK. */
