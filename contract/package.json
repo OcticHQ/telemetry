@@ -17,6 +17,6 @@
   },
   "devDependencies": {
     "@opentelemetry/semantic-conventions": "^1.43.0",
-    "@types/node": "^26.0.0"
+    "@types/node": "^26.6.2"
   }
 }
