@@ -118,7 +118,7 @@ that ended the span.
 ## Links
 
 - [Repository](https://github.com/OcticHQ/telemetry)
-- [Usage guide](https://github.com/OcticHQ/telemetry/blob/main/docs/python-guide.md)
+- [Usage guide](https://github.com/OcticHQ/telemetry/blob/main/docs/full-python-guide.md)
   — every feature, and how they compose
 - [Concepts](https://github.com/OcticHQ/telemetry/blob/main/docs/concepts.md)
 - [Attribute contract](https://github.com/OcticHQ/telemetry/blob/main/contract/ATTRIBUTES.md)

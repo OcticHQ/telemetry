@@ -1,4 +1,4 @@
-# The Octic Telemetry Python SDK usage guide
+# The Octic Telemetry SDK usage guide
 
 Your application already knows things no instrumentation can work out for
 itself: that five model calls were one agent doing one job, which prompt
@@ -25,6 +25,16 @@ pip install octichq-airlock-sdk
 Python 3.10 or newer. The only runtime dependencies are `opentelemetry-api` and
 `opentelemetry-sdk`; the package ships type information (`py.typed`) and no
 instrumentation.
+
+That last part is a requirement, not a detail. Model calls reach the spool only
+if some OpenTelemetry instrumentation — the official
+`opentelemetry-instrumentation-*` packages, OpenLLMetry, or
+`opentelemetry-instrument` auto-instrumentation — creates spans for them. With
+none installed, the annotations still write their own spans, but the model calls
+inside them are missing, and nothing reports it: the silence warning under
+[Debugging](#debugging) arms on the first span started, so a process with no
+instrumentation and no annotations stays silent. Set instrumentation up after
+`init()`.
 
 ## Initialize
 
@@ -452,6 +462,7 @@ than on the resource, since the resource belongs to the host.
 | The directory exists but stays empty | Nothing has been exported yet — the batch processor waits ~5s for company. `force_flush()` to check. |
 | Spans arrive with no prompts or outputs | Expected: the default is `none`. Set `capture="full"` if you want the text. |
 | Spans from your own code are stamped, foreign ones are not | Instrumentation was imported and patched before `init()` ran, or it uses its own provider rather than the global one. |
+| Annotation spans appear, model calls do not | No instrumentation covers your model client, or it was set up before `init()` ran. See [Install](#install). |
 | A decorated function's output is missing | Only the decorator forms read the return value. In a `with` block, call `set_output()`. |
 | Under `init_with_external_provider()`, host spans are enriched but annotations write nothing | The annotations use the global tracer provider and the host never registered itself as one. |
 
