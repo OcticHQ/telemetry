@@ -1,12 +1,11 @@
 # @octichq/airlock-sdk
 
-Agent telemetry for Node — OTLP wiring, durable identity, and agent
-annotations.
+Agent telemetry for [Octic](https://octic.ai) — OpenTelemetry spans, stamped
+with the Octic attribute contract.
 
-> **Not published yet.** This package is scaffolding while the SDK is finished
-> in a separate proof of concept. The pipeline below is real; the surface is
-> not. Watch
-> [OcticHQ/telemetry](https://github.com/OcticHQ/telemetry).
+> **Spool-only by default.** The SDK writes telemetry to a local directory and
+> does not talk to any Octic service: no credential, no network call. A
+> separate reader process delivers what it writes.
 
 ## What it is, and what it is not
 
@@ -42,9 +41,7 @@ silently stops working.
 // telemetry.ts — imported before anything else
 import { init } from '@octichq/airlock-sdk';
 
-init({
-  endpoint: 'https://ingest.octic.ai',
-  auth: { kind: 'apiKey', apiKey: process.env.OCTIC_API_KEY! },
+export const telemetry = init({
   serviceName: 'checkout-agent',
   agent: { id: 'refunds', name: 'Refunds Agent' },
   environment: 'production',
@@ -58,6 +55,9 @@ node --import ./telemetry.ts server.ts
 Telemetry must finish initialising before the libraries it observes are
 imported. Start the process with `--import`, not a top-of-file import — get
 this wrong and the run exits cleanly, reports no error, and produces nothing.
+
+Call `await telemetry.shutdown()` from your own shutdown path — the package
+registers no exit hook.
 
 Then annotate what only your application knows:
 
@@ -97,8 +97,27 @@ all survive with content switched off.
 | `metadata` | `{"redacted":true,"chars":86,"sha256":"a3d44d6b…"}` |
 | `none` | nothing. Everything else is untouched, and the product works here |
 
-Set it per process in `init({ content: { capture: 'none' } })`, or per run with
-`withContent`.
+The default is **`none`**, because the SDK writes to a directory on the host's
+own disk and content there sits at rest. Set it per process with
+`init({ content: { capture: 'full' } })`, or per run with `withContent`.
+
+## Where the telemetry goes
+
+To a spool directory on local disk: `$OCTIC_SPOOL_DIR` if it is set, then
+`/var/spool/octic`, then a per-user directory. Each export batch is written as
+an OTLP/JSON segment, and a separate reader delivers it. Nothing is sent over
+the network by default.
+
+To send over OTLP/HTTP instead, and spool only what could not be delivered:
+
+```ts
+init({
+  serviceName: 'checkout-agent',
+  endpoint: 'https://ingest.octic.ai',
+  auth: { kind: 'apiKey', apiKey: process.env.OCTIC_API_KEY! },
+  spool: { mode: 'fallback' },
+});
+```
 
 ## Requirements
 
@@ -110,6 +129,7 @@ Set it per process in `init({ content: { capture: 'none' } })`, or per run with
 ## Links
 
 - [Repository](https://github.com/OcticHQ/telemetry)
+- [Usage guide](https://github.com/OcticHQ/telemetry/blob/main/docs/node-consumer-guide.md)
 - [Concepts](https://github.com/OcticHQ/telemetry/blob/main/docs/concepts.md)
 - [Attribute contract](https://github.com/OcticHQ/telemetry/blob/main/contract/ATTRIBUTES.md)
   — every key this SDK writes, frozen

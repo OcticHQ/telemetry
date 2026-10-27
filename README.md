@@ -24,7 +24,7 @@ the data afterwards.
 
 | SDK | Package | Tag | Status |
 |---|---|---|---|
-| [Node](node) | `@octichq/airlock-sdk` (npm) | `node/vX.Y.Z` | scaffolded — SDK landing |
+| [Node](node) | `@octichq/airlock-sdk` (npm) | `node/vX.Y.Z` | landed — spool-only by default |
 | [Python](python) | `octichq-airlock-sdk` (PyPI) | `python/vX.Y.Z` | landed — spool-only, unreleased |
 | Go | `github.com/OcticHQ/telemetry/go` | `go/vX.Y.Z` | planned |
 
@@ -55,6 +55,7 @@ published spec, and CI fails if any of them drift.
 | [docs/wire-format.md](docs/wire-format.md) | OTLP endpoints, authentication, what we accept |
 | [docs/python-consumer-guide.md](docs/python-consumer-guide.md) | the Python SDK in four steps — what a consumer is sent |
 | [docs/full-python-guide.md](docs/full-python-guide.md) | the Python SDK in full — every option and failure mode |
+| [docs/node-consumer-guide.md](docs/node-consumer-guide.md) | the Node SDK in four steps — what a consumer is sent |
 | [contract/ATTRIBUTES.md](contract/ATTRIBUTES.md) | the attribute spec |
 | Each SDK's `README.md` | installation and usage for that language |
 
