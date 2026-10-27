@@ -50,6 +50,7 @@ before(async () => {
      */
     endpoint: `${collector.url}/`,
     auth: { kind: 'apiKey', apiKey: 'poc-token' },
+    spool: { mode: 'fallback' },
     serviceName: 'init-integration',
     serviceVersion: '1.4.0',
     agent: { id: 'weather-assistant', name: 'Weather Assistant', assetRef: 'poc/agent/weather' },
@@ -217,6 +218,7 @@ describe('the once-per-process guard', () => {
     const again = init({
       endpoint: collector.url,
       auth: { kind: 'apiKey', apiKey: 'x' },
+      spool: { mode: 'fallback' },
       serviceName: 'again',
     });
 
@@ -247,6 +249,7 @@ describe('the once-per-process guard', () => {
     const external = initWithExternalProvider({
       endpoint: collector.url,
       auth: { kind: 'apiKey', apiKey: 'x' },
+      spool: { mode: 'fallback' },
       serviceName: 'external-after-own',
     });
 

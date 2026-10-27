@@ -1,13 +1,12 @@
 /**
- * `init()` with no credential — the arrangement a consumer lands in by
- * accident, and the one the spool exists for.
+ * `init()` with nothing but a service name and an endpoint: the defaults.
  *
- * A container whose secret was not mounted leaves the credential empty — or,
- * as here, leaves `auth` off altogether. The old behaviour was to send
- * `Bearer undefined`, collect a 401 per batch, and lose everything with only a
- * global-error-handler line to show for it. This asserts the replacement:
- * `init()` returns normally, the process makes no HTTP request it cannot
- * authenticate, every batch is on disk, and the handle says where.
+ * Spool-only, no credential, content off, traces only. The directory comes from
+ * `OCTIC_SPOOL_DIR`, which is how the reader's host tells the SDK where to
+ * write. This asserts that `init()` returns normally, makes no HTTP request
+ * even with a live endpoint to make one to, writes a manifest and a traces
+ * segment, and writes no logs segment — a log record emitted by
+ * instrumentation reaches the global no-op logger instead.
  *
  * A file to itself because init.ts latches on the first call and never re-runs
  * `setup()` — one effective `init()` per process is the budget.
@@ -15,8 +14,7 @@
  *   node --test test/
  */
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -36,15 +34,12 @@ before(async () => {
   collector = await fakeCollector();
   dir = await mkdtemp(join(tmpdir(), 'octic-spool-init-'));
 
+  process.env.OCTIC_SPOOL_DIR = dir;
   telemetry = init({
+    /** Live, so that a request to it would be counted rather than refused. */
     endpoint: collector.url,
-    /** No `auth` at all, which is not the same as `auth: 'none'` — the
-     * accidental case, not a chosen one. `auth.test.ts` covers the other
-     * shape of the same accident, a credential that is present and empty. */
     serviceName: 'init-spool',
     environment: 'test',
-    content: { capture: 'none' },
-    spool: { dir },
   });
 });
 
@@ -54,18 +49,18 @@ after(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe('init() without a credential', () => {
-  it('returns a working Telemetry rather than throwing on the consumer', () => {
+describe('init() with the defaults', () => {
+  it('returns a working Telemetry whose spool is the only sink', () => {
     assert.equal(typeof telemetry.forceFlush, 'function');
     assert.ok(telemetry.spool, 'the spool is on the handle');
-    assert.equal(telemetry.spool.mode, 'only', 'there is nothing to fall back from');
+    assert.equal(telemetry.spool.mode, 'only');
   });
 
-  it('spools both signals and sends nothing it could not have authenticated', async () => {
+  it('spools traces only, and sends nothing', async () => {
     await withWorkflow({ name: 'chat-turn' }, async () => {
       logs
         .getLogger('@vendor/instrumentation-openai')
-        .emit({ body: 'a model call the SDK could not deliver' });
+        .emit({ body: 'a model call written to the logs signal' });
       return undefined;
     });
 
@@ -78,13 +73,23 @@ describe('init() without a credential', () => {
       `no trace segment among ${names.join(', ') || '(none)'}`,
     );
     assert.ok(
-      names.some(name => name.startsWith('logs-')),
-      `no log segment among ${names.join(', ') || '(none)'}`,
+      !names.some(name => name.startsWith('logs-')),
+      `a log segment among ${names.join(', ')}`,
     );
     assert.match(await segmentBytes(dir), /chat-turn/);
 
-    assert.equal(collector.requestCount(), 0, 'no request was made without a credential');
-    assert.equal(telemetry.spool?.directory(), dir);
-    assert.ok((telemetry.spool?.stats().written ?? 0) >= 2);
+    assert.equal(collector.requestCount(), 0, 'a request was made under spool-only');
+    assert.equal(telemetry.spool?.directory(), dir, 'OCTIC_SPOOL_DIR was not used');
+  });
+
+  it('records the endpoint and content capture none in the manifest', async () => {
+    const manifests = (await readdir(dir)).filter(name => name.startsWith('manifest-'));
+    assert.equal(manifests.length, 1, `manifests: ${manifests.join(', ') || '(none)'}`);
+    const manifest = JSON.parse(await readFile(join(dir, manifests[0] ?? ''), 'utf8')) as {
+      endpoint: string;
+      contentCapture: string;
+    };
+    assert.equal(manifest.endpoint, collector.url.replace(/\/$/, ''));
+    assert.equal(manifest.contentCapture, 'none');
   });
 });

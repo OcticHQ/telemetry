@@ -47,6 +47,7 @@ describe('the handle a consumer calls by hand', () => {
     const telemetry = init({
       endpoint: dead,
       auth: { kind: 'apiKey', apiKey: 'x' },
+      spool: { mode: 'fallback' },
       serviceName: 'dead-collector',
     });
 

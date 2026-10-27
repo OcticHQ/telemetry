@@ -51,13 +51,14 @@ export type SpoolSignal = 'traces' | 'logs';
 
 export interface SpoolOptions {
   /**
-   * Defaults to true under `mode: 'only'` or `auth: 'none'` — the arrangements
-   * that have no other way to deliver — and to false otherwise, so the spool is
-   * a choice a consumer makes rather than a directory that appears.
+   * Defaults to true under `mode: 'only'`, the default, or `auth: 'none'` — the
+   * arrangements that have no other way to deliver. Under `mode: 'fallback'`
+   * with a credential it defaults to false, so the fallback directory is a
+   * choice rather than a directory that appears.
    */
   enabled?: boolean;
-  /** `fallback` writes only what the transport could not deliver; `only` never
-   *  constructs a transport at all. */
+  /** `only`, the default, never constructs a transport at all; `fallback`
+   *  writes only what the transport could not deliver. */
   mode?: SpoolMode;
   /** Else `OCTIC_SPOOL_DIR`, else the cascade in `DEFAULT_DIRECTORIES`. */
   dir?: string;
@@ -147,7 +148,7 @@ export const resolveSpoolOptions = (
   { enabledByDefault = false }: { enabledByDefault?: boolean } = {},
 ): SpoolConfig => ({
   enabled: options.enabled ?? enabledByDefault,
-  mode: options.mode ?? 'fallback',
+  mode: options.mode ?? 'only',
   ...(options.dir === undefined ? {} : { dir: options.dir }),
   maxBytes: options.maxBytes ?? 64 * MIB,
   maxFiles: options.maxFiles ?? 10_000,

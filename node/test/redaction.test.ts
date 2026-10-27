@@ -98,18 +98,17 @@ const emit = (content: ContentOptions, wrap: (fn: () => void) => void = fn => fn
 };
 
 /**
- * The default is `full` while this is early — content is opt-out, so a first
- * consumer sees everything the pipeline can carry. Pinned by a test rather than
- * left to the doc comment: a default this consequential should not be able to
- * change without a test changing with it.
+ * The default is `none`: the spool puts what is captured on the host's disk, so
+ * content is opt-in. Pinned by a test rather than left to the doc comment: a
+ * default this consequential should not be able to change without a test
+ * changing with it.
  */
 describe('the default', () => {
-  it('is full — content ships unless the consumer says otherwise', () => {
-    assert.equal(resolvePolicy().capture, 'full');
-    assert.equal(resolvePolicy({}).capture, 'full');
+  it('is none — content ships only when the consumer says so', () => {
+    assert.equal(resolvePolicy().capture, 'none');
+    assert.equal(resolvePolicy({}).capture, 'none');
     const span = emit({});
-    assert.equal(span.attributes['gen_ai.output.messages'], CONTENT['gen_ai.output.messages']);
-    assert.equal(span.attributes['octic.redacted'], undefined);
+    assert.equal(span.attributes['gen_ai.output.messages'], undefined);
   });
 
   it('still ships every governance attribute, same as the closed setting', () => {

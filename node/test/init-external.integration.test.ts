@@ -46,6 +46,7 @@ before(async () => {
   telemetry = initWithExternalProvider({
     endpoint: collector.url,
     auth: { kind: 'apiKey', apiKey: 'poc-token' },
+    spool: { mode: 'fallback' },
     serviceName: 'external-integration',
     agent: { id: 'weather-assistant', name: 'Weather Assistant', assetRef: 'poc/agent/weather' },
     environment: 'test',

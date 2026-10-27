@@ -32,13 +32,12 @@ import { fakeReadableSpan, installContextManager } from './support/harness.ts';
 installContextManager();
 
 /**
- * Reaches `endpoint.replace()` inside `setup()`. A `.js` consumer with no
- * checker produces exactly this, and it is the most ordinary way for setup to
- * fail — which is the point: the interesting failures here are boring ones.
+ * Reaches `endpoint.replace()` inside `setup()` with something that is not a
+ * string. A `.js` consumer with no checker produces exactly this — a port read
+ * out of config as a number — and it is the most ordinary way for setup to
+ * fail, which is the point: the interesting failures here are boring ones.
  */
-const broken = { endpoint: undefined, serviceName: 'broken' } as unknown as Parameters<
-  typeof init
->[0];
+const broken = { endpoint: 4318, serviceName: 'broken' } as unknown as Parameters<typeof init>[0];
 
 describe('an init() that fails inside setup', () => {
   it('returns a handle instead of throwing', async () => {
