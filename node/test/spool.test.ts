@@ -35,7 +35,7 @@ const MANIFEST = {
   contentEncoding: 'identity',
   serviceName: 'test',
   octicSchemaVersion: '1',
-  sdkName: 'octic-node',
+  sdkName: 'octichq-airlock-sdk-node',
   sdkVersion: '0.0.0',
   contentCapture: 'none',
 };

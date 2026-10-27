@@ -94,8 +94,8 @@ groups:
         class: metadata
         owner: octic
         enum:
-          - value: octic-node
-            brief: The Node SDK, `@octichq/telemetry`.
+          - value: octichq-airlock-sdk-node
+            brief: The Node SDK, `@octichq/airlock-sdk`.
           - value: octichq-airlock-sdk
             brief: The Python SDK, `octichq-airlock-sdk`.
         brief: >-

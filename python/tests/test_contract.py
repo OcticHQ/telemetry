@@ -40,7 +40,7 @@ def test_the_instrumentation_scope_is_the_sdk_name() -> None:
 
 def test_the_sibling_sdk_is_still_in_the_enum() -> None:
     """The foreign-span test is set membership, and a one-member set is a literal."""
-    assert gen.OCTIC_SDK_NAME_VALUE_OCTIC_NODE in OCTIC_SDK_NAME_VALUES
+    assert gen.OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE in OCTIC_SDK_NAME_VALUES
 
 
 def test_the_capture_levels_are_the_contract_s() -> None:

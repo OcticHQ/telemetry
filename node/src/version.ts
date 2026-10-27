@@ -1,4 +1,4 @@
-import { OCTIC_SDK_NAME_VALUE_OCTIC_NODE } from './attributes.ts';
+import { OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE } from './attributes.ts';
 
 /**
  * The package version, as a value the SDK can put on the wire.
@@ -28,4 +28,4 @@ export const SDK_VERSION = '0.2.0'; // x-release-please-version
  * against the whole set. Three copies of one name in two languages is how the
  * comparison starts failing open.
  */
-export const SDK_NAME = OCTIC_SDK_NAME_VALUE_OCTIC_NODE;
+export const SDK_NAME = OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE;

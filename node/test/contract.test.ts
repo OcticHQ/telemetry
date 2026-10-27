@@ -34,7 +34,10 @@ import { isContent, isDeniedResourceAttribute, resolvePolicy } from '../src/cont
 import { identityScope } from '../src/identity.ts';
 import { TRACER_NAME, TRACER_VERSION } from '../src/annotations.ts';
 import { SDK_NAME, SDK_VERSION } from '../src/version.ts';
-import { OCTIC_SDK_NAME_VALUE_OCTIC_NODE, OCTIC_SDK_NAME_VALUES } from '../src/attributes.gen.ts';
+import {
+  OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE,
+  OCTIC_SDK_NAME_VALUES,
+} from '../src/attributes.gen.ts';
 
 /**
  * Every generated constant that claims to be a semantic convention, against the
@@ -164,7 +167,7 @@ describe('the wire surface, round trip', () => {
         resource: { 'service.version': '1.4.0' },
         processorDefaults: {
           'octic.schema.version': '1',
-          'octic.sdk.name': 'octic-node',
+          'octic.sdk.name': 'octichq-airlock-sdk-node',
           'octic.sdk.version': '0.0.0',
           'deployment.environment.name': 'test',
         },
@@ -284,7 +287,7 @@ describe('the wire surface, round trip', () => {
 describe('the instrumentation scope', () => {
   it('is the SDK name the contract publishes, not a literal of our own', () => {
     assert.equal(TRACER_NAME, SDK_NAME);
-    assert.equal(SDK_NAME, OCTIC_SDK_NAME_VALUE_OCTIC_NODE);
+    assert.equal(SDK_NAME, OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE);
     assert.ok(
       (OCTIC_SDK_NAME_VALUES as readonly string[]).includes(TRACER_NAME),
       'the scope our spans carry must be a member of octic.sdk.name',

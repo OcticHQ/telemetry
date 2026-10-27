@@ -61,7 +61,7 @@ reader must not infer a count from a file.
   "contentEncoding": "identity",
   "serviceName": "svc-otel",
   "octicSchemaVersion": "1",
-  "sdkName": "octic-node",
+  "sdkName": "octichq-airlock-sdk-node",
   "sdkVersion": "0.0.0",
   "contentCapture": "full",
   "createdAt": "2026-08-16T12:00:00.000Z"
