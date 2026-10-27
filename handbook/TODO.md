@@ -15,7 +15,7 @@ whole migration is tracked in `migration_progress.md`.
       the npm registry — the scope is claimable by anyone until we claim it,
       and [ADR 0004](adr/0004-public-npm-and-the-octic-scope.md) depends on
       having it. Do this first; everything else here is reversible.
-- [ ] **Configure npm trusted publishing** for `@octichq/telemetry`, pointing at
+- [ ] **Configure npm trusted publishing** for `@octichq/airlock-sdk`, pointing at
       this repository and `.github/workflows/_publish-node.yml`. Without it the
       publish job needs an `NPM_TOKEN` secret and produces no provenance.
 - [ ] **Confirm the CODEOWNERS team slug.** `.github/CODEOWNERS` currently

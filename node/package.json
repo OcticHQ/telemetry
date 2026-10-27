@@ -1,10 +1,11 @@
 {
-  "name": "@octichq/telemetry",
+  "name": "@octichq/airlock-sdk",
   "version": "0.2.0",
   "private": false,
-  "description": "Agent telemetry for Node. OTLP wiring, durable identity and agent annotations. Brings no instrumentation of its own.",
+  "description": "Agent telemetry for Node, for Airlock. Stamps the Octic attribute contract onto OpenTelemetry spans and writes them to a local spool. Brings no instrumentation of its own.",
   "keywords": [
     "octic",
+    "airlock",
     "opentelemetry",
     "otel",
     "telemetry",

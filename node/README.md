@@ -1,4 +1,4 @@
-# @octichq/telemetry
+# @octichq/airlock-sdk
 
 Agent telemetry for Node — OTLP wiring, durable identity, and agent
 annotations.
@@ -29,7 +29,7 @@ instrumentation, whichever you chose, comes out carrying your identity.
 ## Install
 
 ```bash
-npm install @octichq/telemetry @opentelemetry/api
+npm install @octichq/airlock-sdk @opentelemetry/api
 ```
 
 `@opentelemetry/api` is a peer dependency, and exactly one copy of it must
@@ -40,7 +40,7 @@ silently stops working.
 
 ```ts
 // telemetry.ts — imported before anything else
-import { init } from '@octichq/telemetry';
+import { init } from '@octichq/airlock-sdk';
 
 init({
   endpoint: 'https://ingest.octic.ai',
@@ -62,7 +62,7 @@ this wrong and the run exits cleanly, reports no error, and produces nothing.
 Then annotate what only your application knows:
 
 ```ts
-import { withIdentity, withWorkflow, withTool, withPrompt } from '@octichq/telemetry';
+import { withIdentity, withWorkflow, withTool, withPrompt } from '@octichq/airlock-sdk';
 
 await withIdentity({ conversationId, userId }, () =>
   withWorkflow({ name: 'refund-request', input: message }, () =>

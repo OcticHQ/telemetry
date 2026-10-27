@@ -1,10 +1,10 @@
 /**
- * `@octichq/telemetry` — agent telemetry for Node.
+ * `@octichq/airlock-sdk` — agent telemetry for Node.
  *
  * No instrumentation. One setup call, and a set of annotations for the things
  * instrumentation cannot see:
  *
- *   init()           wire OTel up correctly, point it at us, declare the agent
+ *   init()           wire OTel up correctly, spool to disk, declare the agent
  *
  *   withIdentity()   durable identity: conversation, end user, business ids
  *   withAgent()      which agent — only when one process runs several
