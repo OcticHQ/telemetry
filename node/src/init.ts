@@ -26,7 +26,7 @@ import { ExportResultCode } from '@opentelemetry/core';
  */
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { resourceFromAttributes } from '@opentelemetry/resources';
+import { detectResources, envDetector, resourceFromAttributes } from '@opentelemetry/resources';
 import {
   BatchLogRecordProcessor,
   LoggerProvider,
@@ -257,12 +257,21 @@ const setup = (
     ...(agent === undefined ? {} : agentAttributes(agent)),
   };
 
-  const resource = resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: serviceName,
-    [ATTR_SERVICE_VERSION]: serviceVersion,
-    ...provenance,
-    ...resourceAttributes,
-  });
+  /**
+   * `OTEL_RESOURCE_ATTRIBUTES` and `OTEL_SERVICE_NAME` first, then what is
+   * passed here, which wins on a collision — the order the Python SDK's
+   * `Resource.create` gives. The environment is how a host that starts the
+   * process says something about it: Airlock puts the run, the workload and the
+   * manifest there, and a resource built from the options alone dropped them.
+   */
+  const resource = detectResources({ detectors: [envDetector] }).merge(
+    resourceFromAttributes({
+      [ATTR_SERVICE_NAME]: serviceName,
+      [ATTR_SERVICE_VERSION]: serviceVersion,
+      ...provenance,
+      ...resourceAttributes,
+    }),
+  );
 
   /**
    * A missing credential is a real deployment — a container whose secret was

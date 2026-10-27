@@ -35,6 +35,8 @@ before(async () => {
   dir = await mkdtemp(join(tmpdir(), 'octic-spool-init-'));
 
   process.env.OCTIC_SPOOL_DIR = dir;
+  /** What Airlock sets on a workload, plus a service name ours must beat. */
+  process.env.OTEL_RESOURCE_ATTRIBUTES = 'airlock.run.id=run-123,service.name=from-env';
   telemetry = init({
     /** Live, so that a request to it would be counted rather than refused. */
     endpoint: collector.url,
@@ -80,6 +82,20 @@ describe('init() with the defaults', () => {
 
     assert.equal(collector.requestCount(), 0, 'a request was made under spool-only');
     assert.equal(telemetry.spool?.directory(), dir, 'OCTIC_SPOOL_DIR was not used');
+  });
+
+  it('carries OTEL_RESOURCE_ATTRIBUTES on the resource, under the options', async () => {
+    const first = (await segments(dir)).find(name => name.startsWith('traces-')) ?? '';
+    const body = JSON.parse(await readFile(join(dir, first), 'utf8')) as {
+      resourceSpans: {
+        resource: { attributes: { key: string; value: { stringValue?: string } }[] };
+      }[];
+    };
+    const attributes = Object.fromEntries(
+      (body.resourceSpans[0]?.resource.attributes ?? []).map(kv => [kv.key, kv.value.stringValue]),
+    );
+    assert.equal(attributes['airlock.run.id'], 'run-123');
+    assert.equal(attributes['service.name'], 'init-spool');
   });
 
   it('records the endpoint and content capture none in the manifest', async () => {
