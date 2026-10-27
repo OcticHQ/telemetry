@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/OcticHQ/telemetry/compare/python-v0.2.0...python-v0.3.0) (2026-10-27)
+
+
+### Features
+
+* **contract:** name the Node SDK octichq-airlock-sdk-node in octic.sdk.name ([f185517](https://github.com/OcticHQ/telemetry/commit/f18551757205761bb5a67ff2cbb688bb2c2a21b1))
+
+
+### Documentation
+
+* **python:** add an instrumentation step to the consumer guide ([1e42cc7](https://github.com/OcticHQ/telemetry/commit/1e42cc78e934da041105e87d329c5b9edd97a7b4))
+
 ## [0.2.0](https://github.com/OcticHQ/telemetry/compare/python-v0.1.0...python-v0.2.0) (2026-09-23)
 
 
