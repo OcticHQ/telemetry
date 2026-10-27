@@ -15,9 +15,11 @@ whole migration is tracked in `migration_progress.md`.
       the npm registry — the scope is claimable by anyone until we claim it,
       and [ADR 0004](adr/0004-public-npm-and-the-octic-scope.md) depends on
       having it. Do this first; everything else here is reversible.
-- [ ] **Configure npm trusted publishing** for `@octichq/airlock-sdk`, pointing at
-      this repository and `.github/workflows/_publish-node.yml`. Without it the
-      publish job needs an `NPM_TOKEN` secret and produces no provenance.
+- [ ] **Configure npm trusted publishing** for `@octichq/airlock-sdk`: repository
+      `OcticHQ/telemetry`, workflow `publish-node.yml`, environment `npm`.
+      Without it the publish job needs an `NPM_TOKEN` secret and produces no
+      provenance. Do it before merging the Node Release PR, which is what
+      publishes.
 - [ ] **Confirm the CODEOWNERS team slug.** `.github/CODEOWNERS` currently
       guesses `@OcticHQ/platform`. An unresolvable owner requests review from
       nobody and looks exactly like a repo with no required reviewers.
@@ -32,7 +34,7 @@ whole migration is tracked in `migration_progress.md`.
 - [ ] Enable **Discussions** (the issue-template config links to it) and
       **private security advisories** (`SECURITY.md` links to it).
 - [ ] Decide whether the **`npm` deployment environment** referenced by
-      `_publish-node.yml` should require manual approval. It is created
+      `publish-node.yml` should require manual approval. It is created
       implicitly today and approves automatically, so the Release PR merge is
       currently the only gate.
 
@@ -159,14 +161,6 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
       `.release-please-manifest.json` rather than from tags, so it should, but
       the next Release PR after the change is the one to read carefully.
       `publish-python.yml` matches both forms already, so it does not care.
-- [ ] **`_publish-node.yml` has the same latent defect.** It publishes with
-      `--provenance` from a reusable workflow called by `ci.yml`, which is what
-      PyPI rejected for Python: the OIDC token names the reusable file and the
-      attestation names the caller, so a registry checking both cannot match
-      one publisher. It is not reachable today because `npm: false`. Restructure
-      it the way `publish-python.yml` is — top-level, triggered by `node/v*` —
-      before flipping that switch, or the first public npm publish fails after
-      the tag is already cut.
 - [ ] **Revisit release-please at 1.0.**
       [ADR 0002](adr/0002-per-sdk-versioning.md) chose it partly for the 0.x
       mode, which stops mattering at 1.0. The tag namespace is portable to

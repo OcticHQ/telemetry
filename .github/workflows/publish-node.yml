@@ -1,0 +1,119 @@
+# Publish @octichq/airlock-sdk to public npm.
+#
+# **Top-level on purpose**, for the reason publish-python.yml gives: trusted
+# publishing does not accept a reusable workflow. A `workflow_call` produces an
+# OIDC token that names the reusable file while the provenance attestation
+# names the caller, and a registry checking both cannot match one publisher.
+# This was `_publish-node.yml`, called from ci.yml, and would have failed the
+# first public publish after the tag was already cut.
+#
+# So: do not convert this back into a `workflow_call`, and do not move the
+# publish step into another workflow. The trusted publisher on npmjs.com names
+# this filename, and changing it here without changing it there stops the
+# publish being authorised.
+#
+# Runs on the tag release-please cuts. That tag is pushed with the org's
+# "Semantic Release" app token rather than the default GITHUB_TOKEN, which is
+# what allows it to start this workflow at all.
+#
+# `workflow_dispatch` is the retry path: a failed publish cannot be re-driven by
+# the tag, which already exists. Dispatch from the default branch and name the
+# tag.
+#
+# An npm version cannot be unpublished after 72 hours, and the number can never
+# be reused.
+name: Publish Node
+
+on:
+  push:
+    tags:
+      # Both separators, as publish-python.yml matches both: release-please cuts
+      # `node-v0.3.0` today, and AGENTS.md documents `node/v0.3.0`.
+      - 'node-v*'
+      - 'node/v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish, e.g. node-v0.3.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: Build and publish
+    runs-on: ubuntu-latest
+
+    # The gate. Add required reviewers to this environment if a release should
+    # wait for a human after the Release PR is merged.
+    environment: npm
+
+    permissions:
+      contents: read
+      # Required for npm trusted publishing (OIDC). This is what replaces a
+      # long-lived NPM_TOKEN secret, and what mints the provenance attestation
+      # on the package page.
+      id-token: write
+
+    defaults:
+      run:
+        working-directory: node
+
+    steps:
+      # The tag's code, not the dispatching branch's.
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - name: Ensure npm supports trusted publishing
+        run: npm install -g npm@^11.5.1
+
+      # A backstop: anyone setting `private` back to true stops the publish.
+      - name: Guard on the private flag
+        id: guard
+        run: |
+          private="$(jq -r '.private // false' package.json)"
+          if [ "$private" = "true" ]; then
+            echo '::notice::node/package.json is private — skipping publish.'
+            echo 'skip=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'skip=false' >> "$GITHUB_OUTPUT"
+          fi
+
+      # Unconditional: a version number cannot be taken back, so the thing being
+      # published has to be the thing the tag names.
+      - name: Check the version matches the tag
+        env:
+          TARGET_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          tag_version="$(printf '%s' "$TARGET_TAG" | sed -E 's|^node[-/]v||')"
+          version="$(jq -r '.version' package.json)"
+          if [ "$tag_version" != "$version" ]; then
+            echo "::error::$TARGET_TAG says $tag_version, package.json says $version"
+            exit 1
+          fi
+          echo "$version matches $TARGET_TAG"
+
+      - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
+        run: npm ci
+
+      # `prepack` builds, `publishConfig.access` makes the scoped package public,
+      # `--provenance` mints the attestation. No NODE_AUTH_TOKEN: authentication
+      # is the OIDC token minted above. If trusted publishing cannot be set up
+      # before the package exists, the one-off fallback is an
+      # `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` env on this step, removed
+      # once the trusted publisher is configured.
+      - name: Publish
+        if: steps.guard.outputs.skip != 'true'
+        run: npm publish --registry=https://registry.npmjs.org --provenance
