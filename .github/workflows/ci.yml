@@ -107,23 +107,7 @@ jobs:
   # ─────────────────────────────────────────────
   # Phase 3 — publish, only on the run that cut a tag
   # ─────────────────────────────────────────────
-  publish-node:
-    name: Publish Node
-    needs: release-please
-    if: needs.release-please.outputs.node-released == 'true'
-    uses: ./.github/workflows/_publish-node.yml
-    with:
-      # THE SWITCH. GitHub Packages always publishes; public npm only when this
-      # is true. Flip it when the SDK is safe to run in someone else's process
-      # — migration_plan.md §2 and §3 — and not before. An npm version cannot
-      # be unpublished after 72 hours and the number can never be reused.
-      npm: false
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-
-  # There is no publish-python job here. PyPI's Trusted Publishing does not
+  # There are no publish jobs here. Trusted publishing on PyPI and npm does not
   # support reusable workflows — the OIDC token and the attestation name
-  # different workflow files — so the Python publish is its own top-level
-  # workflow, publish-python.yml, triggered by the tag this job cuts.
+  # different workflow files — so each publish is its own top-level workflow,
+  # publish-python.yml and publish-node.yml, triggered by the tag this job cuts.
