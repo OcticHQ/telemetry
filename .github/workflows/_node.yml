@@ -218,14 +218,11 @@ jobs:
       - name: Lint the built package
         run: npm run pack:check
 
-      # `--tag` because npm refuses to publish a prerelease version without one,
-      # dry run or not, and node/package.json carries the last release's version
-      # until the Release PR bumps it. A dry run publishes nothing, so the tag
-      # is never used. The real publish stays tag-less on purpose: a prerelease
-      # that reaches it stops there instead of landing on `latest`.
-      - name: Dry-run publish
-        run: npm publish --dry-run --tag ci-dry-run
-
+      # No `npm publish --dry-run`. It asks the registry whether the version is
+      # taken, and node/package.json carries the last release's version until
+      # the Release PR bumps it, so on every build between releases it fails
+      # against the version already on npm. `npm pack` builds the same tarball
+      # without asking.
       - name: Pack
         run: npm pack --pack-destination .
 
