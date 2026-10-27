@@ -58,13 +58,14 @@ tells a client to refresh and retry, and a 403 would not.
 That is one of the reasons an SDK exists rather than a documented curl snippet:
 a static credential pasted into an exporter config would stop working mid-run.
 
-Renewal is per-SDK, because not every SDK talks to ingest at all. The **Node
-SDK** does it with `auth: { kind: 'enrollmentToken', enrollmentToken, tokenUrl }`
-— it exchanges on startup, renews at half the token's life, and retries an
-export once with a fresh token when ingest answers 401. The **Python SDK** has
-no credential and makes no request: it writes batches to a spool directory and a
-separate reader process delivers them, so everything on this page describes what
-that reader does, not what the SDK does.
+Renewal is per-SDK, because not every SDK talks to ingest at all. By default
+**neither SDK** has a credential or makes a request: each writes batches to a
+spool directory and a separate reader process delivers them, so everything on
+this page describes what that reader does, not what the SDK does. The **Node
+SDK** can talk to ingest itself when asked to, with `spool: { mode: 'fallback' }`
+and `auth: { kind: 'enrollmentToken', enrollmentToken, tokenUrl }` — it then
+exchanges on startup, renews at half the token's life, and retries an export
+once with a fresh token when ingest answers 401.
 
 For consumers who cannot run an SDK, a long-lived key branch is planned; until
 it exists, that path is not supported.

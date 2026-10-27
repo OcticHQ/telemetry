@@ -41,30 +41,19 @@ with with_content("metadata"):
     ...
 ```
 
-## The default differs by SDK, and the difference is the transport
+## The default is `none`
 
 | SDK | default |
 |---|---|
-| Node | `full` |
+| Node | `none` |
 | Python | `none` |
 
-**Node defaults to `full`,** and that is temporary. A product nobody can see the
-inside of cannot be evaluated: a first user whose traces show no prompts and no
-outputs cannot distinguish rich telemetry from a broken pipeline, and a silent
-zero-data run is by a distance the most common failure in this space. So content
-is opt-out there while the thing is being evaluated against nobody's real data.
-The expectation is that it flips to `none` before any real tenant is onboarded,
-with the tenant-level setting becoming the thing that turns content on — tracked
-in [`handbook/TODO.md`](../handbook/TODO.md).
-
-**Python defaults to `none`,** because it has no transport. What it captures is
-written to a directory on the host's own disk and sits there at rest until a
-reader collects it, so defaulting to `full` would put a consumer's prompts on
-their own disk as a consequence of installing a package. Opt in there.
+Both SDKs write to a spool directory by default, so what they capture sits on
+the host's own disk at rest until a reader collects it. Defaulting to `full`
+would put a consumer's prompts on their disk as a consequence of installing a
+package. Opt in when you want the text.
 
 Each SDK pins its own default with a test, so neither can change by accident.
-
-If you are deploying Node against real user data today: set the level to `none`.
 
 ## Where it is enforced
 
@@ -77,8 +66,9 @@ instrumentation libraries disagree about which:
   the logs signal.
 
 An SDK that does not carry the logs signal enforces only the first, and the
-second arrives with the signal. The Python SDK is traces-only today; the Node
-SDK carries both.
+second arrives with the signal. The Python SDK is traces-only today. The Node
+SDK carries both when it exports over HTTP, and traces only when it writes to
+the spool alone, which is its default.
 
 The span side is enforced at the **exporter** rather than in a `SpanProcessor`,
 for two reasons that are worth knowing if you are reading the source: a
