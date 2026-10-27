@@ -7,15 +7,10 @@
  * the prompt *name*, the token counts and the asset refs answer every question
  * the product asks, and all of them survive with content switched off.
  *
- * The default is nonetheless `full`, and that is a deliberate early-stage
- * choice rather than a claim that content is harmless. Nobody is running this
- * in production yet, and a product nobody can see the inside of is impossible
- * to evaluate — a first customer whose traces show no prompts and no outputs
- * cannot tell rich telemetry from a broken pipeline. So content is opt-*out*
- * for now: `none` and `metadata` are one option away, per process or per run,
- * and the whole product still works at either. Flipping this back to `none` is
- * a one-line change here plus a doc pass, and is expected to happen before
- * anyone's real data is involved.
+ * So the default is `none`. This SDK writes to a spool on the host's own disk,
+ * and what it captures sits there at rest until a reader collects it; content
+ * reaches that disk because someone chose `metadata` or `full`, per process or
+ * per run, not because they installed a package.
  *
  * Three places produce it, measured from receiver/captured/:
  *
@@ -47,7 +42,7 @@ import {
 export type ContentCapture = 'none' | 'metadata' | 'full';
 
 export interface ContentOptions {
-  /** Defaults to `full` while this is early — see the note at the top of the file. */
+  /** Defaults to `none` — see the note at the top of the file. */
   capture?: ContentCapture;
   /**
    * Last chance to scrub a value the customer knows the shape of better than we
@@ -74,7 +69,7 @@ export interface ContentPolicy {
 }
 
 export const resolvePolicy = (options: ContentOptions = {}): ContentPolicy => ({
-  capture: options.capture ?? 'full',
+  capture: options.capture ?? 'none',
   ...(options.redact === undefined ? {} : { redact: options.redact }),
   maxLength: options.maxLength ?? 4096,
   allow: new Set(options.allowAttributes ?? []),

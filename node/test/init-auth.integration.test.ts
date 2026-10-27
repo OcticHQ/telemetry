@@ -65,6 +65,7 @@ before(async () => {
       tokenUrl: issuer.url,
     },
     serviceName: 'init-auth-integration',
+    spool: { mode: 'fallback' },
     content: { capture: 'none' },
     batch: { scheduledDelayMillis: 60_000 },
   });

@@ -22,6 +22,7 @@ const capture = process.env.OCTIC_CONTENT as 'none' | 'metadata' | 'full' | unde
 const telemetry = init({
   endpoint: process.env.OCTIC_ENDPOINT ?? 'http://127.0.0.1:8400',
   auth: { kind: 'apiKey', apiKey: process.env.OCTIC_API_KEY ?? 'poc-token' },
+  spool: { mode: 'fallback' },
   serviceName: 'smoke-redaction',
   agent: {
     id: 'weather-assistant',

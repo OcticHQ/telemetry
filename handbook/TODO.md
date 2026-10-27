@@ -89,19 +89,6 @@ These are the SDK-shaped items; the ingest-shaped ones stay with be-ingest.
       handle rather than throwing. Done in the non-interference pull request.
       The bounded queue and drop-on-overflow half belongs to the batching one —
       `SimpleSpanProcessor` has no queue to bound.
-- [ ] **Revisit the Node content default when the first tenant is onboarded.**
-      It stays `full` there — decided in the public-surface pull request,
-      reversing this line, which used to say flip it to `none` now. Opt-out is
-      deliberate while nothing real is connected: a first integration whose
-      traces show no prompts and no outputs cannot be told apart from a broken
-      pipeline. The pairing to watch is `capture: 'full'` plus a spool directory
-      — that writes prompts to the host's disk at rest.
-
-      **Python already defaults to `none`**, because the spool is not its
-      failure path but its only sink, so that pairing would be its normal state
-      rather than an edge case. The two SDKs therefore disagree on purpose;
-      `docs/content-policy.md` has the table, and each pins its own default with
-      a test.
 - [x] **Decide the OTLP protocol story.** JSON, and it stays implied by which
       exporter package is imported, because neither exporter takes a `protocol`
       option to say it twice. What the public-surface pull request added is the

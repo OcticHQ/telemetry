@@ -77,21 +77,32 @@ import {
 } from './spool.ts';
 import { SDK_NAME, SDK_VERSION } from './version.ts';
 
+/**
+ * Where the reader that ships the spool delivers it, unless told otherwise. The
+ * same value the Python SDK defaults to.
+ */
+export const DEFAULT_ENDPOINT = 'https://ingest.octic.ai';
+
 export interface InitOptions {
-  /** Base URL of the collector. `/v1/traces` and `/v1/logs` are appended. */
-  endpoint: string;
   /**
-   * How this process authenticates to ingest. Three shapes, in `auth.ts`:
-   * `{ kind: 'apiKey', apiKey }` sends a long-lived key verbatim,
-   * `{ kind: 'enrollmentToken', enrollmentToken, tokenUrl }` exchanges a tenant
-   * enrollment token for short-lived ingest JWTs and keeps renewing them, and
-   * `'none'` sends no credential at all — what a local forwarder expects.
+   * Base URL of the collector. `/v1/traces` and `/v1/logs` are appended.
+   * Defaults to `DEFAULT_ENDPOINT`. Under the default `spool: { mode: 'only' }`
+   * nothing contacts it: it is recorded in the spool manifest, which is how the
+   * reader knows where to deliver.
+   */
+  endpoint?: string;
+  /**
+   * How this process authenticates to ingest, when it sends there at all. Three
+   * shapes, in `auth.ts`: `{ kind: 'apiKey', apiKey }` sends a long-lived key
+   * verbatim, `{ kind: 'enrollmentToken', enrollmentToken, tokenUrl }`
+   * exchanges a tenant enrollment token for short-lived ingest JWTs and keeps
+   * renewing them, and `'none'`, the default, sends no credential at all.
    *
+   * A credential is only used under `spool: { mode: 'fallback' }`; under the
+   * default `'only'` nothing is sent, and passing one warns that it is unused.
    * A credential that is absent or empty is not fatal: it disables the
    * transport and turns the spool on, because a process that cannot
-   * authenticate can still keep its telemetry. Nothing about the spool changes
-   * between the modes except that `'none'` and a missing credential turn it on
-   * by default.
+   * authenticate can still keep its telemetry.
    */
   auth?: AuthOptions;
   serviceName: string;
@@ -108,18 +119,18 @@ export interface InitOptions {
   resourceAttributes?: Record<string, string>;
   /**
    * Whether prompts, tool arguments and model output leave the process, and in
-   * what form. Defaults to `{ capture: 'full' }` while this is early — see the
-   * note at the top of `content.ts`. Set `{ capture: 'none' }` to send no
-   * customer data at all, or `'metadata'` for length plus hash; every
-   * governance attribute ships identically at all three.
+   * what form. Defaults to `{ capture: 'none' }`, because the spool puts what is
+   * captured on this host's disk. `'metadata'` writes a length plus hash and
+   * `'full'` the content itself; every governance attribute ships identically
+   * at all three.
    */
   content?: ContentOptions;
   /**
-   * Where telemetry goes when it cannot be delivered — a dead endpoint, a
-   * credential that does not work, a forwarder that is not up. Off by default
-   * for a normal authenticated process; on by default under `auth: 'none'`, a
-   * missing key, or `spool: { mode: 'only' }`. See spool.ts and
-   * ../../contract/SPOOL.md.
+   * Where telemetry goes. By default (`mode: 'only'`) the spool is the only
+   * sink: export batches are written to a local directory for a separate reader
+   * to deliver, and no socket is opened. `mode: 'fallback'` plus a credential
+   * sends over OTLP/HTTP instead and spools only what could not be delivered.
+   * See spool.ts and ../../contract/SPOOL.md.
    */
   spool?: SpoolOptions;
   /**
@@ -176,9 +187,11 @@ export interface ExternalProviderTelemetry {
    */
   captureContent: boolean;
   /**
-   * Logs only — both of them. The spans are in the host SDK's provider, so
-   * flush and stop those there. The names lost the `Logs` suffix when this
-   * interface was tidied for publication; the scope did not change.
+   * Logs only — both of them, and only when the HTTP transport is on, since a
+   * spool-only process registers no LoggerProvider. The spans are in the host
+   * SDK's provider, so flush and stop those there. The names lost the `Logs`
+   * suffix when this interface was tidied for publication; the scope did not
+   * change.
    */
   forceFlush: () => Promise<void>;
   shutdown: () => Promise<void>;
@@ -197,8 +210,8 @@ export interface ExternalProviderTelemetry {
  */
 const setup = (
   {
-    endpoint,
-    auth,
+    endpoint = DEFAULT_ENDPOINT,
+    auth = 'none',
     serviceName,
     serviceVersion = '0.0.0',
     agent,
@@ -265,17 +278,23 @@ const setup = (
    * for its whole life over a round trip that takes milliseconds.
    */
   const resolvedAuth = resolveAuth(auth);
-  if (resolvedAuth.mode === 'missing') {
+  const credentialed = resolvedAuth.mode !== 'missing';
+
+  const spoolConfig = resolveSpoolOptions(spool, {
+    enabledByDefault:
+      resolvedAuth.mode === 'none' || !credentialed || (spool?.mode ?? 'only') === 'only',
+  });
+  if (spoolConfig.enabled && spoolConfig.mode === 'only' && auth !== 'none') {
+    diag.warn(
+      "octic-telemetry: `auth` is unused under `spool: { mode: 'only' }`, which sends " +
+        "nothing. Set `spool: { mode: 'fallback' }` to export over HTTP.",
+    );
+  } else if (resolvedAuth.mode === 'missing') {
     diag.warn(
       `octic-telemetry: ${resolvedAuth.reason}; not exporting over HTTP. ` +
         'Telemetry will be spooled to disk for the reader to deliver.',
     );
   }
-  const credentialed = resolvedAuth.mode !== 'missing';
-
-  const spoolConfig = resolveSpoolOptions(spool, {
-    enabledByDefault: resolvedAuth.mode === 'none' || !credentialed || spool?.mode === 'only',
-  });
   /** Nothing to fall back *from* when there is no credential. */
   const spoolMode: SpoolMode = credentialed ? spoolConfig.mode : 'only';
   const transport = spoolConfig.enabled ? spoolMode !== 'only' : true;
@@ -407,58 +426,58 @@ const setup = (
     ),
   );
 
-  const logTransport = transport
-    ? withAuthRetry<LogRecordExporter>(
-        new OTLPLogExporter({ url: `${base}${signalPaths.logs}`, headers }),
-        options => new AuthRetryingLogRecordExporter(options),
-      )
-    : undefined;
-  const logExporter = new SafeLogRecordExporter(
-    spoolInstance === undefined
-      ? // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- see the invariant above
-        logTransport!
-      : new SpoolingLogRecordExporter({
-          ...(logTransport === undefined ? {} : { inner: logTransport }),
-          spool: spoolInstance,
-        }),
-  );
-
   /**
-   * Registered unconditionally: some instrumentation puts no message content on
-   * spans and emits it on the logs signal instead. With no LoggerProvider those
-   * records reach the global no-op logger and are dropped silently.
+   * Logs only ride with the HTTP transport. Some instrumentation puts message
+   * content on the logs signal rather than on spans, and with a LoggerProvider
+   * registered those records reach the spool as `logs-*` segments. A spool-only
+   * process is read by something that takes traces, as the Python SDK writes,
+   * so it registers no LoggerProvider and those records go to the global no-op
+   * logger instead.
    */
-  const loggerProvider = new LoggerProvider({
-    resource,
-    /**
-     * Order matters and is the whole mechanism: MultiLogRecordProcessor calls
-     * onEmit in array order, and sdk-logs sanctions mutation during onEmit, so
-     * the redactor must sit ahead of the processor that exports.
-     */
-    processors: [
+  const buildLoggerProvider = (): LoggerProvider => {
+    const logTransport = withAuthRetry<LogRecordExporter>(
+      new OTLPLogExporter({ url: `${base}${signalPaths.logs}`, headers }),
+      options => new AuthRetryingLogRecordExporter(options),
+    );
+    const logExporter = new SafeLogRecordExporter(
+      spoolInstance === undefined
+        ? logTransport
+        : new SpoolingLogRecordExporter({ inner: logTransport, spool: spoolInstance }),
+    );
+    const provider = new LoggerProvider({
+      resource,
       /**
-       * Wrapped for the same reason `onStart` is: `onEmit` runs synchronously
-       * inside the customer's `logger.emit()`, and it reaches further — it
-       * mutates the record and it calls the customer's own `redact` hook.
+       * Order matters and is the whole mechanism: MultiLogRecordProcessor calls
+       * onEmit in array order, and sdk-logs sanctions mutation during onEmit, so
+       * the redactor must sit ahead of the processor that exports.
        */
-      new SafeLogRecordProcessor(new RedactingLogRecordProcessor(contentPolicy)),
-      /**
-       * Guarded like the redactor beside it, for the half of the job the
-       * exporter's own guard cannot do: `BatchLogRecordProcessor.forceFlush`
-       * and `.shutdown()` **reject** when a batch fails
-       * (`BatchLogRecordProcessorBase.js`), and both are reachable from the
-       * consumer's own shutdown path.
-       */
-      new SafeLogRecordProcessor(
-        new BatchLogRecordProcessor({
-          exporter: logExporter,
-          ...batchOptions,
-          selfObsMeterProvider: queueDropMeterProvider(),
-        }),
-      ),
-    ],
-  });
-  logs.setGlobalLoggerProvider(loggerProvider);
+      processors: [
+        /**
+         * Wrapped for the same reason `onStart` is: `onEmit` runs synchronously
+         * inside the customer's `logger.emit()`, and it reaches further — it
+         * mutates the record and it calls the customer's own `redact` hook.
+         */
+        new SafeLogRecordProcessor(new RedactingLogRecordProcessor(contentPolicy)),
+        /**
+         * Guarded like the redactor beside it, for the half of the job the
+         * exporter's own guard cannot do: `BatchLogRecordProcessor.forceFlush`
+         * and `.shutdown()` **reject** when a batch fails
+         * (`BatchLogRecordProcessorBase.js`), and both are reachable from the
+         * consumer's own shutdown path.
+         */
+        new SafeLogRecordProcessor(
+          new BatchLogRecordProcessor({
+            exporter: logExporter,
+            ...batchOptions,
+            selfObsMeterProvider: queueDropMeterProvider(),
+          }),
+        ),
+      ],
+    });
+    logs.setGlobalLoggerProvider(provider);
+    return provider;
+  };
+  const loggerProvider = transport ? buildLoggerProvider() : undefined;
 
   return {
     resource,
@@ -624,7 +643,7 @@ const telemetryFrom = (current: State): Telemetry => {
      */
     forceFlush: async () => {
       await neverRejects('flushing traces', flushTraces);
-      await neverRejects('flushing logs', () => loggerProvider.forceFlush());
+      await neverRejects('flushing logs', () => loggerProvider?.forceFlush() ?? Promise.resolve());
     },
     /**
      * Bounded by `batch.exportTimeoutMillis` per in-flight batch — the queue is
@@ -643,7 +662,10 @@ const telemetryFrom = (current: State): Telemetry => {
          */
         tokenManager?.shutdown();
         await neverRejects('shutting down traces', shutdownTraces);
-        await neverRejects('shutting down logs', () => loggerProvider.shutdown());
+        await neverRejects(
+          'shutting down logs',
+          () => loggerProvider?.shutdown() ?? Promise.resolve(),
+        );
       })();
       await shuttingDown;
     },
@@ -662,7 +684,8 @@ const externalFrom = (current: State): ExternalProviderTelemetry => {
     spanProcessor,
     spanExporter,
     captureContent: contentPolicy.capture !== 'none',
-    forceFlush: () => neverRejects('flushing logs', () => loggerProvider.forceFlush()),
+    forceFlush: () =>
+      neverRejects('flushing logs', () => loggerProvider?.forceFlush() ?? Promise.resolve()),
     /**
      * Latched like `Telemetry.shutdown`, and it cancels the silence watch for
      * the same reason: in this mode the host SDK owns the spans, so its own
@@ -672,7 +695,10 @@ const externalFrom = (current: State): ExternalProviderTelemetry => {
       shuttingDown ??= (async () => {
         cancelSilenceWatch();
         tokenManager?.shutdown();
-        await neverRejects('shutting down logs', () => loggerProvider.shutdown());
+        await neverRejects(
+          'shutting down logs',
+          () => loggerProvider?.shutdown() ?? Promise.resolve(),
+        );
       })();
       await shuttingDown;
     },
