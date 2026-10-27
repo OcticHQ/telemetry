@@ -11,7 +11,7 @@
     "node": {
       "release-type": "node",
       "component": "node",
-      "package-name": "@octichq/telemetry",
+      "package-name": "@octichq/airlock-sdk",
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["src/version.ts"]
     },
