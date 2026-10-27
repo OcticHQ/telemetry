@@ -15,6 +15,7 @@ Copy [`0000-template.md`](0000-template.md) and add a row below.
 | [0004](0004-public-npm-and-the-octic-scope.md) | Public npm under `@octichq`, not GitHub Packages | accepted |
 | [0005](0005-no-root-package-manager.md) | No package manager at the repository root | accepted |
 | [0006](0006-python-ships-spool-only.md) | Ship the Python SDK spool-only, with no transport | accepted |
+| [0007](0007-node-ships-spool-only-by-default.md) | Ship the Node SDK as `@octichq/airlock-sdk`, spool-only by default | accepted |
 
 ## When to write one
 
