@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/OcticHQ/telemetry/compare/node-v0.3.0...node-v0.3.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **node:** carry OTEL_RESOURCE_ATTRIBUTES on the resource ([0113081](https://github.com/OcticHQ/telemetry/commit/0113081c7619408cea2c44eea433f82c851fa826))
+
 ## [0.3.0](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0...node-v0.3.0) (2026-10-27)
 
 
