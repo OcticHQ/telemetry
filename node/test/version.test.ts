@@ -27,5 +27,5 @@ test('SDK_VERSION is a plain semver triple', () => {
 });
 
 test('SDK_NAME is the value the contract expects on the wire', () => {
-  assert.equal(SDK_NAME, 'octic-node');
+  assert.equal(SDK_NAME, 'octichq-airlock-sdk-node');
 });

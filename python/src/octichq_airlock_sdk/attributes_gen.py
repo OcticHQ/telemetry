@@ -54,14 +54,14 @@ came from instrumentation rather than from our own annotations — which is
 why the list lives here and is not restated per language.
 """
 
-OCTIC_SDK_NAME_VALUE_OCTIC_NODE = "octic-node"
-"""The Node SDK, `@octichq/telemetry`."""
+OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE = "octichq-airlock-sdk-node"
+"""The Node SDK, `@octichq/airlock-sdk`."""
 
 OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK = "octichq-airlock-sdk"
 """The Python SDK, `octichq-airlock-sdk`."""
 
 OCTIC_SDK_NAME_VALUES: tuple[str, ...] = (
-    "octic-node",  # The Node SDK, `@octichq/telemetry`.
+    "octichq-airlock-sdk-node",  # The Node SDK, `@octichq/airlock-sdk`.
     "octichq-airlock-sdk",  # The Python SDK, `octichq-airlock-sdk`.
 )
 """Permitted values for `octic.sdk.name`."""
