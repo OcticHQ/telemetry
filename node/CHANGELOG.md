@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.0](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0...node-v0.3.0) (2026-10-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **contract:** `octic.sdk.name` for Python spans is now `octichq-airlock-sdk`; anything matching `octic-python` must match the new value. The Node export `OCTIC_SDK_NAME_VALUE_OCTIC_PYTHON` is renamed to `OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK`. Regenerate the sibling `contracts` repository with `make contract-generate`.
+* **node:** `instrumentationScope.name` on our own spans is `octic-node`, was `octic-telemetry`. `export *` from the attribute contract is replaced by an `ATTR` namespace plus named exports, and the reader-side tables (`CONTENT_KEYS`, `CONTENT_PATTERNS`, `CONTENT_HEURISTIC_MIN_LENGTH`, `EMITTED_ATTRIBUTES`, `INTERNAL_ATTRIBUTES`, `RESOURCE_DENY`, `FIELDS`, `DerivedField`) are no longer published — use `@octichq/contracts`. `Spool`, `resolveSpoolOptions`, `SpoolConfig` and `SpoolManifest` are no longer exported. `IdentitySpanProcessor` is deprecated in favour of `OcticSpanProcessor`. `ExternalProviderTelemetry.identityProcessor`, `.traceExporter`, `.flushLogs` and `.shutdownLogs` are now `.spanProcessor`, `.spanExporter`, `.forceFlush` and `.shutdown`.
+
+### Features
+
+* **contract:** close octic.sdk.name to the SDKs that exist ([4fad2e0](https://github.com/OcticHQ/telemetry/commit/4fad2e00664760de760976f3351ee3bab4241caa))
+* **contract:** name the Node SDK octichq-airlock-sdk-node in octic.sdk.name ([f185517](https://github.com/OcticHQ/telemetry/commit/f18551757205761bb5a67ff2cbb688bb2c2a21b1))
+* **contract:** name the Python SDK octichq-airlock-sdk in octic.sdk.name ([7b731b7](https://github.com/OcticHQ/telemetry/commit/7b731b7e564b095c81fc41c2b21980fa824add79))
+* **node:** default to spool-only, no auth, content capture none and traces only ([dada273](https://github.com/OcticHQ/telemetry/commit/dada2734f110c692a599215055a8d199b1f8ff97))
+* **node:** rename to @octichq/airlock-sdk ([b2cc29f](https://github.com/OcticHQ/telemetry/commit/b2cc29f669b759880d6496b84f0020b1eeddb525))
+* **node:** settle the public surface before the first stable release ([899cd16](https://github.com/OcticHQ/telemetry/commit/899cd16c9ece2991625afd6fc34f25be96e519df))
+
 ## [0.2.0](https://github.com/OcticHQ/telemetry/compare/node-v0.2.0-beta.2...node-v0.2.0) (2026-09-21)
 
 

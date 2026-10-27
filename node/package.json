@@ -1,6 +1,6 @@
 {
   "name": "@octichq/airlock-sdk",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": false,
   "description": "Agent telemetry for Node, for Airlock. Stamps the Octic attribute contract onto OpenTelemetry spans and writes them to a local spool. Brings no instrumentation of its own.",
   "keywords": [

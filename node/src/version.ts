@@ -16,7 +16,7 @@ import { OCTIC_SDK_NAME_VALUE_OCTICHQ_AIRLOCK_SDK_NODE } from './attributes.ts';
  *
  * The trailing marker comment is load-bearing. Do not remove it.
  */
-export const SDK_VERSION = '0.2.0'; // x-release-please-version
+export const SDK_VERSION = '0.3.0'; // x-release-please-version
 
 /**
  * The name reported alongside the version, as `octic.sdk.name`, and the
