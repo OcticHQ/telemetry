@@ -1,24 +1,39 @@
 # @octichq/airlock-sdk
 
-Agent telemetry for [Octic](https://octic.ai) — OpenTelemetry spans, stamped
-with the Octic attribute contract.
+Telemetry for workloads that run in [Airlock](https://octic.ai). Your workload's
+OpenTelemetry spans, tagged with the agent, the run and the prompt, and shown
+with the run in the Airlock console.
 
-> **Spool-only by default.** The SDK writes telemetry to a local directory and
-> does not talk to any Octic service: no credential, no network call. A
-> separate reader process delivers what it writes.
+## How it works in Airlock
+
+Your workload never sends telemetry anywhere. The SDK writes each batch of spans
+to a directory on local disk, and Airlock collects it from there:
+
+1. Airlock starts your workload with `OCTIC_SPOOL_DIR` set to that run's spool
+   directory.
+2. The SDK writes OTLP/JSON segments into it. No socket is opened and no key or
+   credential is needed.
+3. Airlock picks up the segments while the run is going and once more after your
+   workload exits, then stores them against the run.
+4. The run's spans appear in the console beside its other evidence, tagged with
+   the run, the workload and the approved manifest it ran under.
+
+Because Airlock reads the directory after your process exits, a workload that
+crashes keeps what it had already written. What it loses is whatever was still
+queued in memory, so call `shutdown()` before you exit.
 
 ## What it is, and what it is not
 
 **It ships no instrumentation.** Bring whatever you already run — the official
 OpenAI instrumentation, OpenLLMetry, the Vercel AI SDK's built-in telemetry, or
 stock OpenTelemetry — and this package adds the layer above it: the layer that
-knows *these five model calls were one agent doing one job, for that customer,
-from that prompt template.*
+knows _these five model calls were one agent doing one job, from that prompt
+template, touching that datastore._
 
 That layer is the part no interception can produce. Intercepting the network
 call to a model tells you the model, the tokens and the latency. It cannot know
-where a run began, which end user it was for, or which governed asset the agent
-is. None of it can be added to the data afterwards.
+where a run began, which prompt template produced a call, or which asset a tool
+read. None of it can be added to the data afterwards.
 
 The mechanism is one OpenTelemetry `SpanProcessor`. It reads values off the
 OTel Context and stamps them onto every span created through the global
@@ -38,13 +53,12 @@ silently stops working.
 ## Use
 
 ```ts
-// telemetry.ts — imported before anything else
+// telemetry.ts — loaded before anything else
 import { init } from '@octichq/airlock-sdk';
 
 export const telemetry = init({
-  serviceName: 'checkout-agent',
-  agent: { id: 'refunds', name: 'Refunds Agent' },
-  environment: 'production',
+  serviceName: 'loan-assessor',
+  agent: { id: 'loan-assessor', name: 'Loan Assessor' },
 });
 ```
 
@@ -52,63 +66,75 @@ export const telemetry = init({
 node --import ./telemetry.ts server.ts
 ```
 
-Telemetry must finish initialising before the libraries it observes are
-imported. Start the process with `--import`, not a top-of-file import — get
-this wrong and the run exits cleanly, reports no error, and produces nothing.
+Put that in your image's `CMD`. Telemetry must finish initialising before the
+libraries it observes are imported, so start the process with `--import`, not a
+top-of-file import — get this wrong and the run exits cleanly, reports no error,
+and produces no model-call spans.
 
-Call `await telemetry.shutdown()` from your own shutdown path — the package
-registers no exit hook.
-
-Then annotate what only your application knows:
+Then register instrumentation for your model client after `init()`, and
+annotate what only your workload knows:
 
 ```ts
-import { withIdentity, withWorkflow, withTool, withPrompt } from '@octichq/airlock-sdk';
+import { withPrompt, withTool, withWorkflow } from '@octichq/airlock-sdk';
 
-await withIdentity({ conversationId, userId }, () =>
-  withWorkflow({ name: 'refund-request', input: message }, () =>
-    withPrompt({ template: 'refund-triage', version: '3' }, async () => {
-      // your model calls and tool calls, instrumented by whatever you already run
-    }),
-  ),
+const decision = await withWorkflow(
+  { name: 'assess-application', runId: process.env.AIRLOCK_RUN_ID },
+  async () => {
+    const reply = await withPrompt({ template: 'assessment', version: '3' }, () =>
+      client.chat.completions.create({ ... }),
+    );
+    const income = await withTool(
+      { name: 'read_statement', target: { name: 'bank_statement', type: 'datastore' } },
+      () => readStatement(),
+    );
+    return decide(reply, income);
+  },
 );
+
+await telemetry.shutdown();
 ```
+
+Passing `AIRLOCK_RUN_ID` as the `runId` makes the run id on your spans the same
+as the one Airlock assigned to the run, so the two line up in the console.
+Airlock records its own copy of the run id alongside your spans either way.
 
 | Call | What it does |
 |---|---|
 | `init` | wiring, once, before anything else |
-| `withIdentity` | conversation and end user; sets context, emits no span |
-| `withAgent` | only if one process runs several agents |
-| `withPrompt` | which template produced this call |
 | `withWorkflow` | the run root, and the run id |
+| `withPrompt` | which template produced this call |
+| `withTool` | a tool execution, and what it touched |
 | `withRetrieval` | a lookup that fetched context |
-| `withTool` | a tool execution |
+| `withAgent` | only if one process runs several agents |
+| `withIdentity` | conversation and end user; sets context, emits no span |
 | `withContent` | override the content policy for one run |
+
+Whatever a wrapped function returns is recorded as its output, subject to the
+content policy.
 
 ## Content policy
 
 Prompts, tool arguments and model output are your data rather than telemetry
-about it, and none of them are needed to answer a governance question — the
-agent, the run, the prompt *name*, the token counts and the asset references
-all survive with content switched off.
+about it, and none of them are needed to see what a run did — the agent, the
+run, the prompt _name_, the token counts, the timings and the tool targets all
+survive with content switched off.
 
-| level | what leaves your process |
+| level | what is written |
 |---|---|
-| `full` | the content, after your `redact` hook and `maxLength` |
+| `none` | nothing. The default. Everything else is untouched |
 | `metadata` | `{"redacted":true,"chars":86,"sha256":"a3d44d6b…"}` |
-| `none` | nothing. Everything else is untouched, and the product works here |
+| `full` | the content, after your `redact` hook and `maxLength` |
 
-The default is **`none`**, because the SDK writes to a directory on the host's
-own disk and content there sits at rest. Set it per process with
-`init({ content: { capture: 'full' } })`, or per run with `withContent`.
+The default is **`none`**. Turn it on per process with
+`init({ content: { capture: 'full' } })`, or per run with `withContent`, and
+prefer `metadata` where you only need to tell two runs apart.
 
-## Where the telemetry goes
+## Outside Airlock
 
-To a spool directory on local disk: `$OCTIC_SPOOL_DIR` if it is set, then
-`/var/spool/octic`, then a per-user directory. Each export batch is written as
-an OTLP/JSON segment, and a separate reader delivers it. Nothing is sent over
-the network by default.
-
-To send over OTLP/HTTP instead, and spool only what could not be delivered:
+The SDK works the same anywhere. Without `OCTIC_SPOOL_DIR` it writes to
+`/var/spool/octic`, then a per-user directory, and something else has to
+deliver what it writes. To send over OTLP/HTTP instead, and spool only what
+could not be delivered:
 
 ```ts
 init({
