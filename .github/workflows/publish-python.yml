@@ -134,7 +134,7 @@ jobs:
       # Kept even though this workflow publishes, so a run that fails at the
       # upload still leaves something installable to inspect.
       - name: Upload the distributions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: octichq-airlock-sdk-dist
           path: python/dist/
