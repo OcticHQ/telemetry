@@ -16,7 +16,7 @@
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@opentelemetry/semantic-conventions": "^1.43.0",
+    "@opentelemetry/semantic-conventions": "^1.44.0",
     "@types/node": "^26.0.0"
   }
 }
