@@ -25,7 +25,7 @@ RECEIPT_SHAPES: dict[str, str] = {
     "token": r"^[a-z][a-z0-9_]{0,63}$",
     "purpose": r"^[0-9]{3}$",
     "fi_types": r"^[A-Z_]{1,32}(,[A-Z_]{1,32}){0,15}$",
-    "org": r"^[a-z](?:[a-z0-9]|-(?!-))*[a-z0-9]$",
+    "org": r"^[a-z](?:-?[a-z0-9])+$",
     "kid": r"^key_[A-Za-z0-9_-]{43}$",
 }
 """Shape name to a whole-string regular expression."""

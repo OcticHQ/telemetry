@@ -40,5 +40,5 @@ Each pattern must match the whole value.
 | `token` | A short lowercase code, such as a refusal reason. | `^[a-z][a-z0-9_]{0,63}$` |
 | `purpose` | A three-digit consent purpose code. | `^[0-9]{3}$` |
 | `fi_types` | A comma-separated list of one to sixteen financial information types. | `^[A-Z_]{1,32}(,[A-Z_]{1,32}){0,15}$` |
-| `org` | An Airlock org slug. | `^[a-z](?:[a-z0-9]\|-(?!-))*[a-z0-9]$` |
+| `org` | An Airlock org slug. | `^[a-z](?:-?[a-z0-9])+$` |
 | `kid` | A key id, as Airlock's signed key list names one. | `^key_[A-Za-z0-9_-]{43}$` |
