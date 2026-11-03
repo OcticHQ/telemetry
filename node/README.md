@@ -112,6 +112,25 @@ Airlock records its own copy of the run id alongside your spans either way.
 Whatever a wrapped function returns is recorded as its output, subject to the
 content policy.
 
+## Receipts and sealed input (data-blind runs)
+
+An agent can state facts about its own run. Each receipt is checked against the
+vocabulary in [RECEIPTS.md](https://github.com/octic-labs/telemetry/blob/main/contract/RECEIPTS.md)
+and written to the spool directory in the call; no `init()` is needed.
+
+```ts
+import { recordReceipt, sealedInput } from '@octichq/airlock-sdk';
+
+const ok = recordReceipt('input.read', { 'airlock.bytes': 1024 }); // false, never throws, if refused
+
+const blob = await sealedInput(); // Uint8Array, or null
+```
+
+`recordReceipt` returns `false` for a type or attribute off the vocabulary, a
+missing required attribute, a bad value, an unwritable spool, or a 257th receipt.
+`sealedInput()` returns the run's sealed input from the gate when
+`AIRLOCK_RUN_MODE=data_blind`, and `null` otherwise.
+
 ## Content policy
 
 Prompts, tool arguments and model output are your data rather than telemetry

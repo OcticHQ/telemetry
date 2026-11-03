@@ -31,7 +31,16 @@
  * disk under `capture: 'none'`.
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { closeSync, openSync, renameSync, writeSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
 import { chmod, lstat, mkdir, open, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -208,6 +217,47 @@ const isSafeDirectory = async (dir: string): Promise<boolean> => {
   return (info.mode & 0o022) === 0;
 };
 
+const isSafeDirectorySync = (dir: string): boolean => {
+  const info = lstatSync(dir);
+  if (!info.isDirectory()) return false;
+  if (typeof process.getuid !== 'function') return true;
+  if (info.uid !== process.getuid()) return false;
+  return (info.mode & 0o022) === 0;
+};
+
+/**
+ * What a live spool has settled on or been told, so a receipt lands beside the
+ * segments it belongs with. Cleared when that spool shuts down.
+ */
+let sharedConfigured: string | undefined;
+let sharedSettled: string | undefined;
+
+/**
+ * The first directory we can create, trust and write to, resolved
+ * synchronously so a receipt works before `init()` and without a spool. Same
+ * cascade and checks as `Spool`'s own resolution. Undefined if none.
+ */
+export const sharedDirectory = (): string | undefined => {
+  if (sharedSettled !== undefined) return sharedSettled;
+  const candidates = sharedConfigured === undefined ? defaultDirectories() : [sharedConfigured];
+  for (const candidate of candidates) {
+    try {
+      mkdirSync(candidate, { recursive: true, mode: 0o700 });
+      if (!isSafeDirectorySync(candidate)) continue;
+      if (typeof process.getuid === 'function') chmodSync(candidate, 0o700);
+      const probe = join(candidate, `.probe-${process.pid}-${randomBytes(6).toString('hex')}`);
+      closeSync(openSync(probe, 'wx', 0o600));
+      unlinkSync(probe);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  return undefined;
+};
+
+export const newWriterId = (): string => `${process.pid}${randomBytes(3).toString('hex')}`;
+
 export class Spool {
   readonly config: SpoolConfig;
 
@@ -217,7 +267,7 @@ export class Spool {
    * Who wrote a segment, opaque and unique per instance. The pid alone is not:
    * worker threads share one, and so do two providers in a single process.
    */
-  private readonly writerId = `${process.pid}${randomBytes(3).toString('hex')}`;
+  private readonly writerId = newWriterId();
 
   private dir: string | undefined;
   private resolving: Promise<string | undefined> | undefined;
@@ -247,6 +297,7 @@ export class Spool {
 
   constructor(config: SpoolConfig, manifest: ManifestInput) {
     this.config = config;
+    if (config.dir !== undefined) sharedConfigured = config.dir;
     this.manifest = {
       spoolFormatVersion: SPOOL_FORMAT_VERSION,
       ...manifest,
@@ -352,6 +403,8 @@ export class Spool {
     await this.forceFlush();
     this.shuttingDown = true;
     this.owners = 0;
+    if (sharedSettled === this.dir) sharedSettled = undefined;
+    if (sharedConfigured === this.config.dir) sharedConfigured = undefined;
     if (this.exitDrain !== undefined) {
       process.removeListener('exit', this.exitDrain);
       this.exitDrain = undefined;
@@ -444,6 +497,7 @@ export class Spool {
           await unlink(probe);
 
           this.dir = candidate;
+          sharedSettled = candidate;
           this.installExitDrain();
           diag.info(`octic-telemetry: spooling telemetry to ${candidate} (${this.config.mode})`);
           return candidate;
