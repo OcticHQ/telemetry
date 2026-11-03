@@ -84,6 +84,25 @@ no `atexit` hook.
 Each annotation also works as `async with` and as a decorator over a sync or an
 async function.
 
+## Receipts and sealed input (data-blind runs)
+
+An agent can state facts about its own run. Each receipt is checked against the
+vocabulary in [RECEIPTS.md](https://github.com/octic-labs/telemetry/blob/main/contract/RECEIPTS.md)
+and written to the spool directory in the call; no `init()` is needed.
+
+```python
+from octichq_airlock_sdk import record_receipt, sealed_input
+
+ok = record_receipt("input.read", {"airlock.bytes": 1024})  # False, never raises, if refused
+
+blob = sealed_input()  # bytes, or None
+```
+
+`record_receipt` returns `False` for a type or attribute off the vocabulary, a
+missing required attribute, a bad value, an unwritable spool, or a 257th receipt.
+`sealed_input()` returns the run's sealed input from the gate when
+`AIRLOCK_RUN_MODE=data_blind`, and `None` otherwise.
+
 ## Content policy
 
 Prompts, tool arguments and model output are your data rather than telemetry
