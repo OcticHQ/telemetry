@@ -81,7 +81,7 @@ repos:
         entry: npm --prefix contract run --silent generate:local
         language: system
         pass_filenames: false
-        files: ^contract/(attributes\.yaml|generate\.ts)$
+        files: ^contract/(attributes\.yaml|receipts\.yaml|generate\.ts)$
 
       # A component missing from either release-please file is never released
       # and nothing says so. Cheap to check, and much cheaper here than in

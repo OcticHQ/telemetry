@@ -1,0 +1,76 @@
+# The agent receipt vocabulary: what an agent may report about its own run.
+#
+# Source for contract/receipts.json, contract/RECEIPTS.md and the generated
+# RECEIPT_TYPES in each SDK. handbook/adr/0008-agent-receipts-ride-the-spool.md
+# says why there is no free text anywhere below.
+#
+# Every attribute value is checked against a named shape, a whole-string regex.
+# No shape admits a consent id, a customer id, a date range or prose, so a
+# receipt cannot carry the data it describes. Adding a type or an optional
+# attribute is a new vocabulary_version only if a consumer must tell the
+# difference; removing or retyping one always is.
+
+# Our own integer, as schema_version is for attributes.yaml. release-please
+# does not own it.
+vocabulary_version: 1
+contract: airlock.agent-receipts.v1
+max_receipt_bytes: 4096
+max_receipts_per_run: 256
+
+shapes:
+  host:
+    brief: A lowercase DNS hostname of two or more labels. No port, scheme, wildcard, trailing dot or IP literal.
+    pattern: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$'
+  count:
+    brief: A decimal integer from 0 to 9007199254740991 (2^53 - 1), with no leading zero.
+    pattern: '^(?:0|[1-9][0-9]{0,14}|[1-8][0-9]{15}|900[0-6][0-9]{12}|90070[0-9]{11}|90071[0-8][0-9]{10}|900719[0-8][0-9]{9}|9007199[01][0-9]{8}|90071992[0-4][0-9]{7}|900719925[0-3][0-9]{6}|9007199254[0-6][0-9]{5}|90071992547[0-3][0-9]{4}|9007199254740[0-8][0-9]{2}|90071992547409[0-8][0-9]|900719925474099[01])$'
+  digest:
+    brief: A SHA-256 digest, lowercase hex, prefixed sha256.
+    pattern: '^sha256:[0-9a-f]{64}$'
+  token:
+    brief: A short lowercase code, such as a refusal reason.
+    pattern: '^[a-z][a-z0-9_]{0,63}$'
+  purpose:
+    brief: A three-digit consent purpose code.
+    pattern: '^[0-9]{3}$'
+  fi_types:
+    brief: A comma-separated list of one to sixteen financial information types.
+    pattern: '^[A-Z_]{1,32}(,[A-Z_]{1,32}){0,15}$'
+  org:
+    brief: An Airlock org slug.
+    pattern: '^[a-z](?:[a-z0-9]|-(?!-))*[a-z0-9]$'
+  kid:
+    brief: A key id, as Airlock's signed key list names one.
+    pattern: '^key_[A-Za-z0-9_-]{43}$'
+
+types:
+  consent.fetched:
+    required: { airlock.destination: host, airlock.duration.ms: count }
+  consent.verified:
+    required: { airlock.consent.purpose: purpose }
+    optional: { airlock.consent.fi_types: fi_types }
+  consent.refused:
+    required: { airlock.refusal.reason: token }
+  fi.authenticated:
+    required: { airlock.destination: host, airlock.duration.ms: count }
+  fi.requested:
+    required: { airlock.destination: host }
+    optional: { airlock.duration.ms: count }
+  fi.received:
+    required:
+      airlock.destination: host
+      airlock.bytes: count
+      airlock.ciphertext.digest: digest
+      airlock.duration.ms: count
+    optional: { airlock.poll.attempts: count }
+  fi.refused:
+    required: { airlock.destination: host, airlock.refusal.reason: token }
+  input.read:
+    required: { airlock.bytes: count }
+  output.released:
+    required: { airlock.bytes: count, airlock.ciphertext.digest: digest }
+    optional: { airlock.destination: org, airlock.key.id: kid }
+  output.returned:
+    required: { airlock.bytes: count, airlock.ciphertext.digest: digest }
+  output.refused:
+    required: { airlock.refusal.reason: token }

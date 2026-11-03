@@ -16,6 +16,7 @@ Copy [`0000-template.md`](0000-template.md) and add a row below.
 | [0005](0005-no-root-package-manager.md) | No package manager at the repository root | accepted |
 | [0006](0006-python-ships-spool-only.md) | Ship the Python SDK spool-only, with no transport | accepted |
 | [0007](0007-node-ships-spool-only-by-default.md) | Ship the Node SDK as `@octichq/airlock-sdk`, spool-only by default | accepted |
+| [0008](0008-agent-receipts-ride-the-spool.md) | Agent receipts ride the spool, outside the batch queue and the content policy | accepted |
 
 ## When to write one
 
