@@ -1,6 +1,6 @@
 # The spool format, version 1
 
-`spoolFormatVersion: 1` · produced by `node/src/spool.ts`
+`spoolFormatVersion: 1` · produced by `node/src/spool.ts` and the Python SDK's `spool.py`
 
 When the SDK cannot deliver — no credential, a token exchange that is failing,
 ingest refusing connections or answering 5xx after the exporter's own retries —
@@ -104,6 +104,40 @@ segments alone rather than guess.
 8. **Reading a segment is reading customer prompts** at `capture: 'full'`. It is
    a production data-access path and deserves the same authorization and audit
    the span store gets.
+
+## Receipts
+
+An agent can also record a **receipt**: a short, structured statement about its
+own run, from the vocabulary in [RECEIPTS.md](RECEIPTS.md). It lands in the same
+directory as a file of its own, never in a segment and never through the batch
+queue, so a full queue cannot drop one.
+
+```
+<dir>/receipt-<epochMs>-<seq>-<writer>.json           one receipt
+<dir>/receipt-<epochMs>-<seq>-<writer>.json.tmp       a write in progress
+```
+
+`<seq>` is zero-padded to six digits, as it is for segments. The file holds
+
+```json
+{"receiptFormatVersion":1,"type":"input.read","attributes":{"airlock.bytes":"1024"},"occurredAt":"2026-11-03T12:00:00.000Z"}
+```
+
+Attribute values are strings, each matching its shape in RECEIPTS.md. A file is
+at most 4096 bytes. The writer writes it inside the call, fsyncs it and renames
+it from `.tmp`, so a file you can see is complete, and it stops after 256
+receipts per process. A receipt is written whenever the SDK resolves a safe
+spool directory, whether or not the span exporter is enabled. The content
+policy does not apply: the vocabulary replaces it.
+
+The bounds, eviction and age sweep above never touch a receipt, because all
+three match `*.otlp.json` only.
+
+**A reader that follows the rules above ignores receipts**: it globs
+`*.otlp.json`, which no receipt matches. A reader that wants them globs
+`receipt-*.json` and validates each against RECEIPTS.md. Airlock's orchestrator
+from before receipts existed does not ignore them; it deletes any file it does
+not recognise as junk, unread.
 
 ## Bounds the writer enforces
 

@@ -1,0 +1,129 @@
+/**
+ * GENERATED — do not edit.
+ *
+ * Source:     contract/receipts.yaml (vocabulary_version 1)
+ * Regenerate: node contract/generate.ts
+ *
+ * What an agent may report about its own run: each receipt type, its
+ * required and optional attributes, and the shape every value must match.
+ * Shapes are whole-string regular expressions, as strings, so a consumer
+ * compiles them with its own engine. There is no free text in any of them.
+ */
+
+export const RECEIPT_VOCABULARY_VERSION = 1;
+
+export const RECEIPT_CONTRACT = 'airlock.agent-receipts.v1';
+
+export const MAX_RECEIPT_BYTES = 4096;
+
+export const MAX_RECEIPTS_PER_RUN = 256;
+
+/** Shape name to a whole-string regular expression. */
+export const RECEIPT_SHAPES = {
+  host: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$',
+  count: '^(?:0|[1-9][0-9]{0,14}|[1-8][0-9]{15}|900[0-6][0-9]{12}|90070[0-9]{11}|90071[0-8][0-9]{10}|900719[0-8][0-9]{9}|9007199[01][0-9]{8}|90071992[0-4][0-9]{7}|900719925[0-3][0-9]{6}|9007199254[0-6][0-9]{5}|90071992547[0-3][0-9]{4}|9007199254740[0-8][0-9]{2}|90071992547409[0-8][0-9]|900719925474099[01])$',
+  digest: '^sha256:[0-9a-f]{64}$',
+  token: '^[a-z][a-z0-9_]{0,63}$',
+  purpose: '^[0-9]{3}$',
+  fi_types: '^[A-Z_]{1,32}(,[A-Z_]{1,32}){0,15}$',
+  org: '^[a-z](?:[a-z0-9]|-(?!-))*[a-z0-9]$',
+  kid: '^key_[A-Za-z0-9_-]{43}$',
+} as const;
+
+export type ReceiptShape = keyof typeof RECEIPT_SHAPES;
+
+/** Receipt type to the attributes it requires and allows, each with its shape. */
+export const RECEIPT_TYPES = {
+  'consent.fetched': {
+    required: {
+      'airlock.destination': 'host',
+      'airlock.duration.ms': 'count',
+    },
+    optional: {
+    },
+  },
+  'consent.verified': {
+    required: {
+      'airlock.consent.purpose': 'purpose',
+    },
+    optional: {
+      'airlock.consent.fi_types': 'fi_types',
+    },
+  },
+  'consent.refused': {
+    required: {
+      'airlock.refusal.reason': 'token',
+    },
+    optional: {
+    },
+  },
+  'fi.authenticated': {
+    required: {
+      'airlock.destination': 'host',
+      'airlock.duration.ms': 'count',
+    },
+    optional: {
+    },
+  },
+  'fi.requested': {
+    required: {
+      'airlock.destination': 'host',
+    },
+    optional: {
+      'airlock.duration.ms': 'count',
+    },
+  },
+  'fi.received': {
+    required: {
+      'airlock.destination': 'host',
+      'airlock.bytes': 'count',
+      'airlock.ciphertext.digest': 'digest',
+      'airlock.duration.ms': 'count',
+    },
+    optional: {
+      'airlock.poll.attempts': 'count',
+    },
+  },
+  'fi.refused': {
+    required: {
+      'airlock.destination': 'host',
+      'airlock.refusal.reason': 'token',
+    },
+    optional: {
+    },
+  },
+  'input.read': {
+    required: {
+      'airlock.bytes': 'count',
+    },
+    optional: {
+    },
+  },
+  'output.released': {
+    required: {
+      'airlock.bytes': 'count',
+      'airlock.ciphertext.digest': 'digest',
+    },
+    optional: {
+      'airlock.destination': 'org',
+      'airlock.key.id': 'kid',
+    },
+  },
+  'output.returned': {
+    required: {
+      'airlock.bytes': 'count',
+      'airlock.ciphertext.digest': 'digest',
+    },
+    optional: {
+    },
+  },
+  'output.refused': {
+    required: {
+      'airlock.refusal.reason': 'token',
+    },
+    optional: {
+    },
+  },
+} as const;
+
+export type ReceiptType = keyof typeof RECEIPT_TYPES;
