@@ -191,9 +191,47 @@ def _is_safe_directory(path: Path) -> bool:
     return info.st_mode & 0o022 == 0
 
 
-def _new_writer_id() -> str:
+def new_writer_id() -> str:
     """Opaque and unique per instance. The pid alone is not: threads share one."""
     return f"{os.getpid()}{secrets.token_hex(3)}"
+
+
+def first_safe_directory(candidates: list[Path]) -> Path | None:
+    """The first candidate we can create, trust and write to, else ``None``."""
+    for candidate in candidates:
+        try:
+            candidate.mkdir(mode=0o700, parents=True, exist_ok=True)
+            if not _is_safe_directory(candidate):
+                continue
+            # mkdir's mode is masked by umask and ignored when the directory
+            # already existed, so set it explicitly either way.
+            if hasattr(os, "getuid"):
+                os.chmod(candidate, 0o700)
+            # Random, not just pid and clock: two processes probing the same
+            # directory at once would otherwise collide on `O_EXCL`.
+            probe = candidate / f".probe-{os.getpid()}-{secrets.token_hex(6)}"
+            fd = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            os.close(fd)
+            os.unlink(probe)
+        except OSError:
+            continue
+        return candidate
+    return None
+
+
+def shared_directory() -> Path | None:
+    """The directory the receipts go to, with or without ``init()``.
+
+    A live spool's settled directory wins, then its configured one, then the
+    default cascade, so a receipt lands beside the segments it belongs with.
+    """
+    live = next(iter(_live), None)
+    if live is not None and live._dir is not None:
+        return live._dir
+    configured = live.options.dir if live is not None else None
+    return first_safe_directory(
+        [Path(configured)] if configured is not None else _default_directories()
+    )
 
 
 # Every live spool, so a fork can give each of them a new writer id. Weak, so the
@@ -253,7 +291,7 @@ class Spool:
             datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
         )
 
-        self._writer_id = _new_writer_id()
+        self._writer_id = new_writer_id()
         self._seq = 0
 
         self._dir: Path | None = None
@@ -322,7 +360,7 @@ class Spool:
         """In the child, right after ``fork()``. The lock may be held by a thread
         that no longer exists here, so it is replaced rather than acquired."""
         self._lock = threading.Lock()
-        self._writer_id = _new_writer_id()
+        self._writer_id = new_writer_id()
         self._seq = 0
 
     def _is_disabled(self) -> bool:
@@ -371,28 +409,12 @@ class Spool:
         candidates = (
             [Path(self.options.dir)] if self.options.dir is not None else _default_directories()
         )
-        for candidate in candidates:
-            try:
-                candidate.mkdir(mode=0o700, parents=True, exist_ok=True)
-                if not _is_safe_directory(candidate):
-                    continue
-                # mkdir's mode is masked by umask and ignored when the directory
-                # already existed, so set it explicitly either way.
-                if hasattr(os, "getuid"):
-                    os.chmod(candidate, 0o700)
-                # Random, not just pid and clock: two processes probing the same
-                # directory at once would otherwise collide on `O_EXCL`.
-                probe = candidate / f".probe-{os.getpid()}-{secrets.token_hex(6)}"
-                fd = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-                os.close(fd)
-                os.unlink(probe)
-            except OSError:
-                continue
-
-            self._dir = candidate
+        found = first_safe_directory(candidates)
+        if found is not None:
+            self._dir = found
             self._resolved = True
-            log.info("octichq-airlock-sdk: spooling telemetry to %s", candidate)
-            return candidate
+            log.info("octichq-airlock-sdk: spooling telemetry to %s", found)
+            return found
 
         self._resolved = True
         log.warning(
@@ -428,8 +450,8 @@ class Spool:
             self._note_failure(error, "manifest write")
             return
         try:
-            _fchmod(fd, 0o600)
-            _write_all(fd, (json.dumps(self._manifest, indent=2) + "\n").encode())
+            fchmod(fd, 0o600)
+            write_all(fd, (json.dumps(self._manifest, indent=2) + "\n").encode())
             self._manifest_written = True
         except OSError as error:
             self._note_failure(error, "manifest write")
@@ -458,8 +480,8 @@ class Spool:
             fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             try:
                 # Explicit, because open's mode is masked by the host's umask.
-                _fchmod(fd, 0o600)
-                _write_all(fd, body)
+                fchmod(fd, 0o600)
+                write_all(fd, body)
                 if self.options.fsync:
                     os.fsync(fd)
             finally:
@@ -587,7 +609,7 @@ class Spool:
         return not over()
 
 
-def _write_all(fd: int, data: bytes) -> None:
+def write_all(fd: int, data: bytes) -> None:
     """``os.write`` may write less than asked. A short segment is a corrupt one."""
     view = memoryview(data)
     while view:
@@ -595,6 +617,6 @@ def _write_all(fd: int, data: bytes) -> None:
         view = view[written:]
 
 
-def _fchmod(fd: int, mode: int) -> None:
+def fchmod(fd: int, mode: int) -> None:
     if hasattr(os, "fchmod"):
         os.fchmod(fd, mode)
