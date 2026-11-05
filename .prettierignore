@@ -5,6 +5,8 @@
 
 # Generated. Owned by contract/generate.ts and release-please respectively.
 node/src/attributes.gen.ts
+node/src/receipts.gen.ts
+contract/receipts.json
 contract/ATTRIBUTES.md
 contract/version.txt
 

@@ -49,6 +49,7 @@ from .pipeline import (
 )
 from .processor import OcticSpanProcessor
 from .prompt import Prompt, with_prompt
+from .receipts import record_receipt, sealed_input
 from .redacting_exporter import RedactingSpanExporter
 from .run import Run, current_run_id, mint_run_id, with_run
 from .spool import SpoolOptions, SpoolStats
@@ -97,7 +98,9 @@ __all__ = [
     "init",
     "init_with_external_provider",
     "mint_run_id",
+    "record_receipt",
     "resolve_policy",
+    "sealed_input",
     "with_agent",
     "with_content",
     "with_identity",

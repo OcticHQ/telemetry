@@ -1,5 +1,6 @@
 /**
- * Generates every artifact derived from contract/attributes.yaml.
+ * Generates every artifact derived from contract/attributes.yaml and
+ * contract/receipts.yaml.
  *
  *   node contract/generate.ts            write the artifacts
  *   node contract/generate.ts --check    fail if they are stale, or if the
@@ -27,6 +28,9 @@ import { parse } from 'yaml';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const SOURCE = join(HERE, 'attributes.yaml');
+const RECEIPTS_SOURCE = join(HERE, 'receipts.yaml');
+const OUT_RECEIPTS_JSON = join(HERE, 'receipts.json');
+const OUT_RECEIPTS_MD = join(HERE, 'RECEIPTS.md');
 
 /**
  * The published spec. Language-neutral, and the only artifact an external
@@ -103,18 +107,14 @@ interface Contract {
 
 // ── small helpers ───────────────────────────────────────────────────────────
 
-const REQUIREMENTS: Requirement[] = [
-  'required',
-  'conditionally_required',
-  'recommended',
-  'opt_in',
-];
+const REQUIREMENTS: Requirement[] = ['required', 'conditionally_required', 'recommended', 'opt_in'];
 const CLASSES: AttributeClass[] = ['identity', 'metadata', 'content', 'environment'];
 
 /** YAML folded scalars keep their newlines; tables and doc comments want one line. */
 const oneLine = (text: string): string => text.replace(/\s+/g, ' ').trim();
 
-const constantName = (key: string): string => `ATTR_${key.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
+const constantName = (key: string): string =>
+  `ATTR_${key.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}`;
 
 const enumConstantName = (key: string): string =>
   `${key.toUpperCase().replace(/[^A-Z0-9]+/g, '_')}_VALUES`;
@@ -133,8 +133,7 @@ const enumMemberName = (key: string, member: EnumMember): string =>
 const quote = (value: string): string => `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`;
 
 /** The same for Python, which prefers double quotes and knows nothing of TypeScript's escapes. */
-const pyQuote = (value: string): string =>
-  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+const pyQuote = (value: string): string => `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
 /**
  * A raw literal, so a regex reaches Python exactly as the contract wrote it.
@@ -292,10 +291,14 @@ const validate = (contract: Contract): string[] => {
         problems.push(`${attribute.id}: owner is semconv but no constant name given`);
       }
       if (attribute.owner === 'octic' && !attribute.id.startsWith(reserved)) {
-        problems.push(`${attribute.id}: owned by us but outside the reserved ${quote(reserved)} namespace`);
+        problems.push(
+          `${attribute.id}: owned by us but outside the reserved ${quote(reserved)} namespace`,
+        );
       }
       if (attribute.id.startsWith(customer)) {
-        problems.push(`${attribute.id}: sits in the customer namespace ${quote(customer)}, which we must not write`);
+        problems.push(
+          `${attribute.id}: sits in the customer namespace ${quote(customer)}, which we must not write`,
+        );
       }
       if (attribute.requirement === 'conditionally_required' && attribute.condition === undefined) {
         problems.push(`${attribute.id}: conditionally_required with no condition`);
@@ -315,7 +318,8 @@ const validate = (contract: Contract): string[] => {
     if (field.aliases.length === 0) problems.push(`${field.id}: no aliases`);
     for (const alias of field.aliases) {
       const previous = aliasOwners.get(alias);
-      if (previous !== undefined) problems.push(`${alias}: claimed by both ${previous} and ${field.id}`);
+      if (previous !== undefined)
+        problems.push(`${alias}: claimed by both ${previous} and ${field.id}`);
       else aliasOwners.set(alias, field.id);
     }
     for (const [from, to] of Object.entries(field.normalize ?? {})) {
@@ -370,9 +374,12 @@ const validateSemconv = (contract: Contract): string[] => {
     for (const member of attribute.enum ?? []) {
       if (member.semconv === undefined) continue;
       const value = semconv[member.semconv];
-      if (value === undefined) problems.push(`${attribute.id}: semconv exports no ${member.semconv}`);
+      if (value === undefined)
+        problems.push(`${attribute.id}: semconv exports no ${member.semconv}`);
       else if (value !== member.value) {
-        problems.push(`${attribute.id}: semconv ${member.semconv} is ${quote(value)}, not ${quote(member.value)}`);
+        problems.push(
+          `${attribute.id}: semconv ${member.semconv} is ${quote(value)}, not ${quote(member.value)}`,
+        );
       }
     }
   }
@@ -425,20 +432,24 @@ const emitTypeScript = (
   w(' */');
   w();
 
-  w(docComment(
-    'Version of the attribute contract this build was generated from. Emitted as octic.schema.version so a consumer can tell a missing attribute from an older SDK.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'Version of the attribute contract this build was generated from. Emitted as octic.schema.version so a consumer can tell a missing attribute from an older SDK.',
+      undefined,
+    ),
+  );
   w(`export const OCTIC_SCHEMA_VERSION = '${contract.schema_version}';`);
   w();
 
   w(docComment('Ours. Nothing outside the SDK may write into this namespace.', undefined));
   w(`export const RESERVED_ATTRIBUTE_PREFIX = ${quote(contract.namespaces.reserved)};`);
   w();
-  w(docComment(
-    'Where tenant-supplied business identifiers land. Separate from the reserved prefix so a customer key can never overwrite one of ours.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'Where tenant-supplied business identifiers land. Separate from the reserved prefix so a customer key can never overwrite one of ours.',
+      undefined,
+    ),
+  );
   w(`export const CUSTOMER_ATTRIBUTE_PREFIX = ${quote(contract.namespaces.customer)};`);
   w();
 
@@ -461,7 +472,12 @@ const emitTypeScript = (
         attribute.owner === 'semconv'
           ? `Semantic convention, verified against the pinned release as \`${attribute.semconv ?? ''}\`.`
           : undefined;
-      w(docComment(attribute.brief, [attribute.note, provenance].filter(Boolean).join(' ') || undefined));
+      w(
+        docComment(
+          attribute.brief,
+          [attribute.note, provenance].filter(Boolean).join(' ') || undefined,
+        ),
+      );
       w(`export const ${constantName(attribute.id)} = ${quote(attribute.id)};`);
       w();
 
@@ -485,32 +501,40 @@ const emitTypeScript = (
 
   w('// ── content policy ─────────────────────────────────────────────────────────');
   w();
-  w(docComment(
-    'Every key known to carry customer content, across our own output, the vendor keys we read, and vendor keys with no canonical field. Derived from the class column, so this list and the published document cannot disagree.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'Every key known to carry customer content, across our own output, the vendor keys we read, and vendor keys with no canonical field. Derived from the class column, so this list and the published document cannot disagree.',
+      undefined,
+    ),
+  );
   w('export const CONTENT_KEYS: readonly string[] = [');
   for (const key of contentKeys(contract)) w(`  ${quote(key)},`);
   w('];');
   w();
-  w(docComment(
-    'The half that catches what the list does not. A denylist alone fails open the day a vendor ships a key we have never seen.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'The half that catches what the list does not. A denylist alone fails open the day a vendor ships a key we have never seen.',
+      undefined,
+    ),
+  );
   w('export const CONTENT_PATTERNS: readonly RegExp[] = [');
   for (const pattern of contract.content.patterns) w(`  /${pattern}/,`);
   w('];');
   w();
-  w(docComment(
-    'A string longer than this, authored by a scope we do not control, is treated as content whatever it is called.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'A string longer than this, authored by a scope we do not control, is treated as content whatever it is called.',
+      undefined,
+    ),
+  );
   w(`export const CONTENT_HEURISTIC_MIN_LENGTH = ${contract.content.heuristic_min_length};`);
   w();
-  w(docComment(
-    'Resource attributes nobody asked for. Dropped at the SDK exporter for a customer who runs our SDK, and at ingest for one who does not.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'Resource attributes nobody asked for. Dropped at the SDK exporter for a customer who runs our SDK, and at ingest for one who does not.',
+      undefined,
+    ),
+  );
   w('export const RESOURCE_DENY: readonly string[] = [');
   for (const key of deniedKeys(contract)) w(`  ${quote(key)},`);
   w('];');
@@ -523,10 +547,12 @@ const emitTypeScript = (
   for (const key of emittedKeys(contract)) w(`  ${quote(key)},`);
   w('];');
   w();
-  w(docComment(
-    'Plumbing that must never leave the process. A consumer that sees one of these is looking at output from a broken exporter.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'Plumbing that must never leave the process. A consumer that sees one of these is looking at output from a broken exporter.',
+      undefined,
+    ),
+  );
   w('export const INTERNAL_ATTRIBUTES: readonly string[] = [');
   for (const key of internalKeys(contract)) w(`  ${quote(key)},`);
   w('];');
@@ -539,10 +565,12 @@ const emitTypeScript = (
    * guards the contract would be a poor joke.
    */
   if (options.semconvNames) {
-    w(docComment(
-      'Every constant here that claims to be a semantic convention, mapped to the value semconv must still give it. The generator verifies this against the pinned release on each run; contract.test.ts iterates it to verify again at test time.',
-      undefined,
-    ));
+    w(
+      docComment(
+        'Every constant here that claims to be a semantic convention, mapped to the value semconv must still give it. The generator verifies this against the pinned release on each run; contract.test.ts iterates it to verify again at test time.',
+        undefined,
+      ),
+    );
     w('export const SEMCONV_NAMES: Readonly<Record<string, string>> = {');
     const claims = new Map<string, string>();
     for (const attribute of attributesOf(contract)) {
@@ -560,10 +588,12 @@ const emitTypeScript = (
 
   w('// ── derived fields (attributes we read but do not own) ─────────────────────');
   w();
-  w(docComment(
-    'Facts foreign instrumentation records. Each entry is a canonical field, the aliases accepted for it in priority order, and any value normalisation. Resolve a field through this table rather than naming a vendor key directly: an upstream rename then costs an added alias, not a code change.',
-    undefined,
-  ));
+  w(
+    docComment(
+      'Facts foreign instrumentation records. Each entry is a canonical field, the aliases accepted for it in priority order, and any value normalisation. Resolve a field through this table rather than naming a vendor key directly: an upstream rename then costs an added alias, not a code change.',
+      undefined,
+    ),
+  );
   w('export const FIELDS = {');
   for (const field of fieldsOf(contract)) {
     w(docComment(field.brief, undefined, '  '));
@@ -815,9 +845,15 @@ const emitMarkdown = (contract: Contract): string => {
   w();
   w('| Stability | Who writes it | What the freeze commits us to |');
   w('|---|---|---|');
-  w('| **emitted** | our SDK | An API promise. A rename is a major version with dual-write, because customer queries and our graph writes key off these. This half is also the port spec. |');
-  w('| **consumed** | foreign instrumentation | The *reader*, not the key. We cannot freeze what we do not own, so what is fixed is the canonical field name, the accepted aliases and the value normalisation. An upstream rename is an additive alias. |');
-  w('| **denied** | foreign instrumentation | The policy, not the list. The list grows as vendors ship new detectors. |');
+  w(
+    '| **emitted** | our SDK | An API promise. A rename is a major version with dual-write, because customer queries and our graph writes key off these. This half is also the port spec. |',
+  );
+  w(
+    '| **consumed** | foreign instrumentation | The *reader*, not the key. We cannot freeze what we do not own, so what is fixed is the canonical field name, the accepted aliases and the value normalisation. An upstream rename is an additive alias. |',
+  );
+  w(
+    '| **denied** | foreign instrumentation | The policy, not the list. The list grows as vendors ship new detectors. |',
+  );
   w();
   w('Frozen does not mean immutable, and it does not mean stored. It means');
   w('additive-only and versioned: removing a key or changing its type costs a');
@@ -861,8 +897,13 @@ const emitMarkdown = (contract: Contract): string => {
           attribute.condition === undefined
             ? attribute.requirement
             : `${attribute.requirement}<br/>*(${cell(attribute.condition)})*`;
-        const key = flags.length === 0 ? `\`${attribute.id}\`` : `\`${attribute.id}\`<br/>${flags.join(', ')}`;
-        w(`| ${key} | \`${attribute.type}\` | ${requirement} | ${attribute.class} | ${attribute.owner} |`);
+        const key =
+          flags.length === 0
+            ? `\`${attribute.id}\``
+            : `\`${attribute.id}\`<br/>${flags.join(', ')}`;
+        w(
+          `| ${key} | \`${attribute.type}\` | ${requirement} | ${attribute.class} | ${attribute.owner} |`,
+        );
       }
       w();
       for (const attribute of group.attributes) {
@@ -899,7 +940,8 @@ const emitMarkdown = (contract: Contract): string => {
             : Object.entries(field.normalize)
                 .map(([from, to]) => `\`${from}\` → \`${to}\``)
                 .join('<br/>');
-        const name = field.class === 'content' ? `\`${field.id}\` **(content)**` : `\`${field.id}\``;
+        const name =
+          field.class === 'content' ? `\`${field.id}\` **(content)**` : `\`${field.id}\``;
         w(`| ${name} | \`${field.type}\` | ${aliases} | ${normalize} |`);
       }
       w();
@@ -1005,7 +1047,9 @@ const restatedKeys = (contract: Contract): string[] => {
   ]);
 
   const problems: string[] = [];
-  for (const path of LANGUAGES.flatMap(target => target.handWritten).map(file => join(ROOT, file))) {
+  for (const path of LANGUAGES.flatMap(target => target.handWritten).map(file =>
+    join(ROOT, file),
+  )) {
     let source: string;
     try {
       source = readFileSync(path, 'utf8');
@@ -1021,6 +1065,201 @@ const restatedKeys = (contract: Contract): string[] => {
     }
   }
   return problems;
+};
+
+// ── the receipt vocabulary ──────────────────────────────────────────────────
+
+/** The second source: what an agent may report about its run. See receipts.yaml. */
+interface ReceiptShape {
+  brief: string;
+  pattern: string;
+}
+
+interface ReceiptType {
+  required: Record<string, string>;
+  optional?: Record<string, string>;
+}
+
+interface Receipts {
+  vocabulary_version: number;
+  contract: string;
+  max_receipt_bytes: number;
+  max_receipts_per_run: number;
+  shapes: Record<string, ReceiptShape>;
+  types: Record<string, ReceiptType>;
+}
+
+const validateReceipts = (receipts: Receipts): string[] => {
+  const problems: string[] = [];
+  if (!Number.isInteger(receipts.vocabulary_version) || receipts.vocabulary_version < 1) {
+    problems.push('vocabulary_version must be a positive integer');
+  }
+  for (const [name, shape] of Object.entries(receipts.shapes)) {
+    try {
+      new RegExp(shape.pattern);
+    } catch {
+      problems.push(`shape ${name}: pattern does not compile`);
+    }
+    if (!shape.pattern.startsWith('^') || !shape.pattern.endsWith('$')) {
+      problems.push(`shape ${name}: pattern must match the whole value (^…$)`);
+    }
+  }
+  for (const [type, spec] of Object.entries(receipts.types)) {
+    const optional = spec.optional ?? {};
+    for (const [key, shape] of [...Object.entries(spec.required), ...Object.entries(optional)]) {
+      if (!key.startsWith('airlock.')) problems.push(`type ${type}: ${key} is outside airlock.*`);
+      if (!(shape in receipts.shapes))
+        problems.push(`type ${type}: ${key} names unknown shape ${shape}`);
+    }
+    for (const key of Object.keys(optional)) {
+      if (key in spec.required) problems.push(`type ${type}: ${key} is both required and optional`);
+    }
+  }
+  return problems;
+};
+
+/** The pinned artifact. Airlock copies it byte for byte, so key order is the YAML's. */
+const emitReceiptsJson = (receipts: Receipts): string => {
+  const shapes = Object.fromEntries(
+    Object.entries(receipts.shapes).map(([name, shape]) => [name, shape.pattern]),
+  );
+  const types = Object.fromEntries(
+    Object.entries(receipts.types).map(([type, spec]) => [
+      type,
+      { required: spec.required, optional: spec.optional ?? {} },
+    ]),
+  );
+  const body = {
+    vocabularyVersion: receipts.vocabulary_version,
+    contract: receipts.contract,
+    maxReceiptBytes: receipts.max_receipt_bytes,
+    maxReceiptsPerRun: receipts.max_receipts_per_run,
+    shapes,
+    types,
+  };
+  return `${JSON.stringify(body, null, 2)}\n`;
+};
+
+const receiptsMarkdown = (receipts: Receipts): string => {
+  const out: string[] = [];
+  const w = (line = ''): void => void out.push(line);
+  const keys = (map: Record<string, string> | undefined): string =>
+    map === undefined || Object.keys(map).length === 0
+      ? '—'
+      : Object.entries(map)
+          .map(([key, shape]) => `\`${key}\` (${shape})`)
+          .join(', ');
+
+  w('# The Octic agent receipt vocabulary');
+  w();
+  w(`**Vocabulary version ${receipts.vocabulary_version}** · \`${receipts.contract}\``);
+  w();
+  w('<!-- GENERATED from contract/receipts.yaml by contract/generate.ts. Do not edit. -->');
+  w();
+  w('What an agent may report about its own run, through `record_receipt` /');
+  w('`recordReceipt`. A receipt is a type and a set of attributes; both are');
+  w('checked against this vocabulary and anything else is refused. No value is');
+  w('free text: each is checked against one of the shapes below.');
+  w();
+  w(`A receipt file is at most ${receipts.max_receipt_bytes} bytes, and a run holds at most`);
+  w(`${receipts.max_receipts_per_run} receipts. The file format is in [SPOOL.md](SPOOL.md).`);
+  w();
+  w('## Types');
+  w();
+  w('| Type | Required | Optional |');
+  w('|---|---|---|');
+  for (const [type, spec] of Object.entries(receipts.types)) {
+    w(`| \`${type}\` | ${keys(spec.required)} | ${keys(spec.optional)} |`);
+  }
+  w();
+  w('## Shapes');
+  w();
+  w('Each pattern must match the whole value.');
+  w();
+  w('| Shape | Meaning | Pattern |');
+  w('|---|---|---|');
+  for (const [name, shape] of Object.entries(receipts.shapes)) {
+    w(`| \`${name}\` | ${cell(shape.brief)} | \`${shape.pattern.replace(/\|/g, '\\|')}\` |`);
+  }
+  return `${out.join('\n')}\n`;
+};
+
+const receiptsHeader = (receipts: Receipts): string[] => [
+  'GENERATED — do not edit.',
+  '',
+  `Source:     contract/receipts.yaml (vocabulary_version ${receipts.vocabulary_version})`,
+  'Regenerate: node contract/generate.ts',
+  '',
+  'What an agent may report about its own run: each receipt type, its',
+  'required and optional attributes, and the shape every value must match.',
+  'Shapes are whole-string regular expressions, as strings, so a consumer',
+  'compiles them with its own engine. There is no free text in any of them.',
+];
+
+const emitReceiptsTypeScript = (receipts: Receipts): string => {
+  const out: string[] = ['/**'];
+  for (const line of receiptsHeader(receipts)) out.push(line === '' ? ' *' : ` * ${line}`);
+  out.push(' */', '');
+  out.push(`export const RECEIPT_VOCABULARY_VERSION = ${receipts.vocabulary_version};`, '');
+  out.push(`export const RECEIPT_CONTRACT = ${quote(receipts.contract)};`, '');
+  out.push(`export const MAX_RECEIPT_BYTES = ${receipts.max_receipt_bytes};`, '');
+  out.push(`export const MAX_RECEIPTS_PER_RUN = ${receipts.max_receipts_per_run};`, '');
+  out.push('/** Shape name to a whole-string regular expression. */');
+  out.push('export const RECEIPT_SHAPES = {');
+  for (const [name, shape] of Object.entries(receipts.shapes)) {
+    out.push(`  ${name}: ${quote(shape.pattern)},`);
+  }
+  out.push('} as const;', '');
+  out.push('export type ReceiptShape = keyof typeof RECEIPT_SHAPES;', '');
+  const map = (indent: string, attrs: Record<string, string> | undefined): string[] =>
+    Object.entries(attrs ?? {}).map(([key, shape]) => `${indent}${quote(key)}: ${quote(shape)},`);
+  out.push('/** Receipt type to the attributes it requires and allows, each with its shape. */');
+  out.push('export const RECEIPT_TYPES = {');
+  for (const [type, spec] of Object.entries(receipts.types)) {
+    out.push(`  ${quote(type)}: {`, '    required: {', ...map('      ', spec.required), '    },');
+    out.push('    optional: {', ...map('      ', spec.optional), '    },', '  },');
+  }
+  out.push('} as const;', '');
+  out.push('export type ReceiptType = keyof typeof RECEIPT_TYPES;', '');
+  return out.join('\n');
+};
+
+const emitReceiptsPython = (receipts: Receipts): string => {
+  const out: string[] = [TRIPLE, ...receiptsHeader(receipts), TRIPLE, ''];
+  out.push(`RECEIPT_VOCABULARY_VERSION = ${receipts.vocabulary_version}`, '');
+  out.push(`RECEIPT_CONTRACT = ${pyQuote(receipts.contract)}`, '');
+  out.push(`MAX_RECEIPT_BYTES = ${receipts.max_receipt_bytes}`, '');
+  out.push(`MAX_RECEIPTS_PER_RUN = ${receipts.max_receipts_per_run}`, '');
+  out.push('RECEIPT_SHAPES: dict[str, str] = {');
+  for (const [name, shape] of Object.entries(receipts.shapes)) {
+    out.push(`    ${pyQuote(name)}: ${pyRaw(shape.pattern)},`);
+  }
+  out.push('}', pyDoc('Shape name to a whole-string regular expression.', undefined), '');
+  const map = (indent: string, attrs: Record<string, string> | undefined): string[] =>
+    Object.entries(attrs ?? {}).map(
+      ([key, shape]) => `${indent}${pyQuote(key)}: ${pyQuote(shape)},`,
+    );
+  out.push('RECEIPT_TYPES: dict[str, dict[str, dict[str, str]]] = {');
+  for (const [type, spec] of Object.entries(receipts.types)) {
+    out.push(
+      `    ${pyQuote(type)}: {`,
+      '        "required": {',
+      ...map('            ', spec.required),
+      '        },',
+    );
+    out.push(
+      '        "optional": {',
+      ...map('            ', spec.optional),
+      '        },',
+      '    },',
+    );
+  }
+  out.push(
+    '}',
+    pyDoc('Receipt type to the attributes it requires and allows, each with its shape.', undefined),
+    '',
+  );
+  return out.join('\n');
 };
 
 // ── language targets ────────────────────────────────────────────────────────
@@ -1045,6 +1284,9 @@ interface LanguageTarget {
   language: string;
   out: string;
   emit: (contract: Contract) => string;
+  /** Where the receipt vocabulary lands for this language, and its emitter. */
+  receiptsOut: string;
+  emitReceipts: (receipts: Receipts) => string;
   handWritten: string[];
 }
 
@@ -1053,6 +1295,8 @@ const LANGUAGES: LanguageTarget[] = [
     language: 'node',
     out: 'node/src/attributes.gen.ts',
     emit: contract => emitTypeScript(contract),
+    receiptsOut: 'node/src/receipts.gen.ts',
+    emitReceipts: emitReceiptsTypeScript,
     // A file listed here and not readable is an error, not a skip — a drift
     // list that quietly shrinks is the failure it exists to prevent.
     //
@@ -1087,6 +1331,8 @@ const LANGUAGES: LanguageTarget[] = [
     language: 'python',
     out: 'python/src/octichq_airlock_sdk/attributes_gen.py',
     emit: contract => emitPython(contract),
+    receiptsOut: 'python/src/octichq_airlock_sdk/receipts_gen.py',
+    emitReceipts: emitReceiptsPython,
     // Same rule as the Node list: every hand-written source that reasons about
     // an attribute key belongs here. `restatedKeys` strips `#` comments and
     // docstrings for these, which is what the Python entries needed before the
@@ -1241,7 +1487,10 @@ const resolveExternal = (target: ExternalTarget, contract: Contract): Resolution
 
   const path = join(root, target.out);
   if (!existsSync(dirname(path))) {
-    return { status: 'error', note: `${target.id}: ${dirname(path)} does not exist (not creating it)` };
+    return {
+      status: 'error',
+      note: `${target.id}: ${dirname(path)} does not exist (not creating it)`,
+    };
   }
 
   return { status: 'ready', path, body: target.emit(contract) };
@@ -1249,12 +1498,18 @@ const resolveExternal = (target: ExternalTarget, contract: Contract): Resolution
 
 // ── entry point ─────────────────────────────────────────────────────────────
 
-const artifacts = (contract: Contract): { path: string; body: string }[] => [
+const artifacts = (contract: Contract, receipts: Receipts): { path: string; body: string }[] => [
   ...LANGUAGES.map(target => ({
     path: join(ROOT, target.out),
     body: `${target.emit(contract)}`,
   })),
   { path: OUT_MD, body: `${emitMarkdown(contract)}\n` },
+  ...LANGUAGES.map(target => ({
+    path: join(ROOT, target.receiptsOut),
+    body: target.emitReceipts(receipts),
+  })),
+  { path: OUT_RECEIPTS_JSON, body: emitReceiptsJson(receipts) },
+  { path: OUT_RECEIPTS_MD, body: receiptsMarkdown(receipts) },
 ];
 
 const main = (): void => {
@@ -1268,7 +1523,16 @@ const main = (): void => {
     return;
   }
 
-  const generated = artifacts(contract);
+  const receipts = parse(readFileSync(RECEIPTS_SOURCE, 'utf8')) as Receipts;
+  const receiptProblems = validateReceipts(receipts);
+  if (receiptProblems.length > 0) {
+    process.stderr.write(`contract/receipts.yaml is invalid:\n`);
+    for (const problem of receiptProblems) process.stderr.write(`  ${problem}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const generated = artifacts(contract, receipts);
   const external = EXTERNAL.map(target => resolveExternal(target, contract));
   // Reported, and acted on, only after every in-repo artifact — a sibling
   // checkout must never be able to stop ATTRIBUTES.md being written.
