@@ -23,6 +23,7 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 
 from .receipts_gen import (
+    MAX_ATTRIBUTE_VALUE_CHARS,
     MAX_RECEIPT_BYTES,
     MAX_RECEIPTS_PER_RUN,
     RECEIPT_SHAPES,
@@ -81,6 +82,8 @@ def _check(type_: str, attributes: Mapping[str, str | int]) -> dict[str, str] | 
         if shape is None or isinstance(value, bool) or not isinstance(value, (str, int)):
             return None
         text = str(value)
+        if len(text) > MAX_ATTRIBUTE_VALUE_CHARS:
+            return None
         # fullmatch, not match: `$` also matches before a trailing newline.
         if _COMPILED[shape].fullmatch(text) is None:
             return None
