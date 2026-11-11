@@ -222,16 +222,21 @@ def first_safe_directory(candidates: list[Path]) -> Path | None:
 def shared_directory() -> Path | None:
     """The directory the receipts go to, with or without ``init()``.
 
-    A live spool's settled directory wins, then its configured one, then the
-    default cascade, so a receipt lands beside the segments it belongs with.
+    A named directory (the live spool's ``dir``, else ``OCTIC_SPOOL_DIR``) is the
+    only candidate: Airlock reads only the directory it named, so a receipt that
+    fell through to the cascade would be lost while the call reported success.
+    Unnamed, the live spool's settled directory wins, then the default cascade,
+    so a receipt lands beside the segments it belongs with.
     """
     live = next(iter(_live), None)
+    named = live.options.dir if live is not None else None
+    if named is None:
+        named = os.environ.get("OCTIC_SPOOL_DIR") or None
+    if named is not None:
+        return first_safe_directory([Path(named)])
     if live is not None and live._dir is not None:
         return live._dir
-    configured = live.options.dir if live is not None else None
-    return first_safe_directory(
-        [Path(configured)] if configured is not None else _default_directories()
-    )
+    return first_safe_directory(_default_directories())
 
 
 # Every live spool, so a fork can give each of them a new writer id. Weak, so the
