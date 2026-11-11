@@ -1085,6 +1085,7 @@ interface Receipts {
   contract: string;
   max_receipt_bytes: number;
   max_receipts_per_run: number;
+  max_attribute_value_chars: number;
   shapes: Record<string, ReceiptShape>;
   types: Record<string, ReceiptType>;
 }
@@ -1093,6 +1094,12 @@ const validateReceipts = (receipts: Receipts): string[] => {
   const problems: string[] = [];
   if (!Number.isInteger(receipts.vocabulary_version) || receipts.vocabulary_version < 1) {
     problems.push('vocabulary_version must be a positive integer');
+  }
+  if (
+    !Number.isInteger(receipts.max_attribute_value_chars) ||
+    receipts.max_attribute_value_chars < 1
+  ) {
+    problems.push('max_attribute_value_chars must be a positive integer');
   }
   for (const [name, shape] of Object.entries(receipts.shapes)) {
     try {
@@ -1134,6 +1141,7 @@ const emitReceiptsJson = (receipts: Receipts): string => {
     contract: receipts.contract,
     maxReceiptBytes: receipts.max_receipt_bytes,
     maxReceiptsPerRun: receipts.max_receipts_per_run,
+    maxAttributeValueChars: receipts.max_attribute_value_chars,
     shapes,
     types,
   };
@@ -1162,7 +1170,8 @@ const receiptsMarkdown = (receipts: Receipts): string => {
   w('free text: each is checked against one of the shapes below.');
   w();
   w(`A receipt file is at most ${receipts.max_receipt_bytes} bytes, and a run holds at most`);
-  w(`${receipts.max_receipts_per_run} receipts. The file format is in [SPOOL.md](SPOOL.md).`);
+  w(`${receipts.max_receipts_per_run} receipts. An attribute value is at most`);
+  w(`${receipts.max_attribute_value_chars} characters, whatever its shape allows. The file format is in [SPOOL.md](SPOOL.md).`);
   w();
   w('## Types');
   w();
@@ -1204,6 +1213,10 @@ const emitReceiptsTypeScript = (receipts: Receipts): string => {
   out.push(`export const RECEIPT_CONTRACT = ${quote(receipts.contract)};`, '');
   out.push(`export const MAX_RECEIPT_BYTES = ${receipts.max_receipt_bytes};`, '');
   out.push(`export const MAX_RECEIPTS_PER_RUN = ${receipts.max_receipts_per_run};`, '');
+  out.push(
+    `export const MAX_ATTRIBUTE_VALUE_CHARS = ${receipts.max_attribute_value_chars};`,
+    '',
+  );
   out.push('/** Shape name to a whole-string regular expression. */');
   out.push('export const RECEIPT_SHAPES = {');
   for (const [name, shape] of Object.entries(receipts.shapes)) {
@@ -1230,6 +1243,7 @@ const emitReceiptsPython = (receipts: Receipts): string => {
   out.push(`RECEIPT_CONTRACT = ${pyQuote(receipts.contract)}`, '');
   out.push(`MAX_RECEIPT_BYTES = ${receipts.max_receipt_bytes}`, '');
   out.push(`MAX_RECEIPTS_PER_RUN = ${receipts.max_receipts_per_run}`, '');
+  out.push(`MAX_ATTRIBUTE_VALUE_CHARS = ${receipts.max_attribute_value_chars}`, '');
   out.push('RECEIPT_SHAPES: dict[str, str] = {');
   for (const [name, shape] of Object.entries(receipts.shapes)) {
     out.push(`    ${pyQuote(name)}: ${pyRaw(shape.pattern)},`);
