@@ -4,7 +4,7 @@
  *   node --test test/receipts.test.ts
  */
 import assert from 'node:assert/strict';
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -111,6 +111,21 @@ describe('recordReceipt', () => {
     });
     assert.equal(recordReceipt('input.read', { 'airlock.bytes': 1 }), false);
     await spool.shutdown();
+  });
+
+  it('is false on an unsafe OCTIC_SPOOL_DIR rather than falling through the cascade', async () => {
+    // Airlock reads only the directory it named, so a receipt anywhere else is lost.
+    await withSpoolDir(async dir => {
+      const unsafe = join(dir, 'unsafe');
+      await mkdir(unsafe);
+      await chmod(unsafe, 0o777);
+      const fallback = join(dir, 'state');
+      process.env.OCTIC_SPOOL_DIR = unsafe;
+      process.env.XDG_STATE_HOME = fallback;
+      assert.equal(recordReceipt('input.read', { 'airlock.bytes': 1 }), false);
+      await assert.rejects(receiptFiles(join(fallback, 'octic', 'spool')), { code: 'ENOENT' });
+      assert.deepEqual(await receiptFiles(unsafe), []);
+    });
   });
 
   it('survives a full span spool under evict-oldest, and is never evicted', async () => {
