@@ -235,11 +235,19 @@ let sharedSettled: string | undefined;
 /**
  * The first directory we can create, trust and write to, resolved
  * synchronously so a receipt works before `init()` and without a spool. Same
- * cascade and checks as `Spool`'s own resolution. Undefined if none.
+ * checks as `Spool`'s own resolution. Undefined if none.
+ *
+ * A named directory (the live spool's `dir`, else `OCTIC_SPOOL_DIR`) is the only
+ * candidate: Airlock reads only the directory it named, so a receipt that fell
+ * through the cascade would be lost while the call reported success.
  */
 export const sharedDirectory = (): string | undefined => {
-  if (sharedSettled !== undefined) return sharedSettled;
-  const candidates = sharedConfigured === undefined ? defaultDirectories() : [sharedConfigured];
+  const env = process.env.OCTIC_SPOOL_DIR;
+  const named = sharedConfigured ?? (env === '' ? undefined : env);
+  if (sharedSettled !== undefined && (named === undefined || sharedSettled === named)) {
+    return sharedSettled;
+  }
+  const candidates = named === undefined ? defaultDirectories() : [named];
   for (const candidate of candidates) {
     try {
       mkdirSync(candidate, { recursive: true, mode: 0o700 });
