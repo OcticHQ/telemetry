@@ -204,3 +204,18 @@ def test_sealed_input_is_none_when_the_gate_is_missing(
     assert sealed_input() is None
     monkeypatch.setenv("AIRLOCK_GATE_SOCKET", str(tmp_path / "absent.sock"))
     assert sealed_input() is None
+
+
+def test_each_distinct_refusal_warns_once(
+    spool_dir: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
+    monkeypatch.delenv("AIRLOCK_GATE_SOCKET", raising=False)
+    with caplog.at_level("WARNING", logger="octichq_airlock_sdk"):
+        assert record_receipt("not.a.type", {}) is False
+        assert record_receipt("not.a.type", {}) is False
+        assert sealed_input() is None
+    messages = [record.getMessage() for record in caplog.records]
+    assert len(messages) == 2
+    assert "vocabulary" in messages[0]
+    assert "AIRLOCK_GATE_SOCKET" in messages[1]
