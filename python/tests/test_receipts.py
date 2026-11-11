@@ -219,3 +219,16 @@ def test_each_distinct_refusal_warns_once(
     assert len(messages) == 2
     assert "vocabulary" in messages[0]
     assert "AIRLOCK_GATE_SOCKET" in messages[1]
+
+
+def test_a_value_over_the_character_limit_is_refused(spool_dir: Path) -> None:
+    # Sixteen 32-character types fit the fi_types shape at 527 characters,
+    # which Airlock's orchestrator refuses.
+    long = ",".join(["A" * 32] * 16)
+    fits = ",".join(["A" * 32] * 15)
+    assert len(long) > 512 >= len(fits)
+    purpose = {"airlock.consent.purpose": "101"}
+    assert (
+        record_receipt("consent.verified", {**purpose, "airlock.consent.fi_types": long}) is False
+    )
+    assert record_receipt("consent.verified", {**purpose, "airlock.consent.fi_types": fits}) is True
