@@ -153,6 +153,22 @@ describe('recordReceipt', () => {
   });
 });
 
+describe('the character limit', () => {
+  it('refuses a value over 512 characters that its shape would allow', async () => {
+    await withSpoolDir(async dir => {
+      process.env.OCTIC_SPOOL_DIR = dir;
+      // Sixteen 32-character types fit fi_types at 527 characters; Airlock refuses them.
+      const long = Array.from({ length: 16 }, () => 'A'.repeat(32)).join(',');
+      const fits = Array.from({ length: 15 }, () => 'A'.repeat(32)).join(',');
+      const purpose = { 'airlock.consent.purpose': '101' };
+      const verified = (types: string) =>
+        recordReceipt('consent.verified', { ...purpose, 'airlock.consent.fi_types': types });
+      assert.equal(verified(long), false);
+      assert.equal(verified(fits), true);
+    });
+  });
+});
+
 describe('warnings', () => {
   it('prints each distinct refusal once, without OCTIC_TELEMETRY_DEBUG', async () => {
     delete process.env.OCTIC_TELEMETRY_DEBUG;

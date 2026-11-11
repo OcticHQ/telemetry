@@ -18,6 +18,8 @@ export const MAX_RECEIPT_BYTES = 4096;
 
 export const MAX_RECEIPTS_PER_RUN = 256;
 
+export const MAX_ATTRIBUTE_VALUE_CHARS = 512;
+
 /** Shape name to a whole-string regular expression. */
 export const RECEIPT_SHAPES = {
   host: '^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$',
