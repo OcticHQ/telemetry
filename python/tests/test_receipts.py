@@ -115,6 +115,37 @@ def test_it_writes_before_init_and_returns_false_on_an_unwritable_spool(
     assert record_receipt("input.read", {"airlock.bytes": 1}) is False
 
 
+def test_an_unsafe_configured_spool_is_false_even_when_spans_fell_through(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Airlock reads only the directory it named, so a receipt anywhere else is lost.
+    unsafe = tmp_path / "unsafe"
+    unsafe.mkdir()
+    unsafe.chmod(0o777)
+    fallback = tmp_path / "fallback"
+    monkeypatch.setenv("OCTIC_SPOOL_DIR", str(unsafe))
+    monkeypatch.setattr(
+        "octichq_airlock_sdk.spool._default_directories", lambda: [unsafe, fallback]
+    )
+    receipts._reset_for_tests()
+    manifest = ManifestInput(
+        endpoint="https://ingest.example.test/",
+        service_name="svc",
+        octic_schema_version="1",
+        sdk_name="octichq-airlock-sdk",
+        sdk_version="0.0.0",
+        content_capture="full",
+    )
+    spool = Spool(SpoolOptions(), manifest)
+    assert spool.write("traces", b'{"resourceSpans":[]}') is True
+    assert spool.directory == str(fallback)
+
+    assert record_receipt("input.read", {"airlock.bytes": 1}) is False
+    assert files(fallback) == []
+    assert files(unsafe) == []
+    spool.shutdown()
+
+
 # -- the sealed input -----------------------------------------------------------
 
 
