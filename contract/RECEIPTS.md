@@ -10,7 +10,8 @@ checked against this vocabulary and anything else is refused. No value is
 free text: each is checked against one of the shapes below.
 
 A receipt file is at most 4096 bytes, and a run holds at most
-256 receipts. The file format is in [SPOOL.md](SPOOL.md).
+256 receipts. An attribute value is at most
+512 characters, whatever its shape allows. The file format is in [SPOOL.md](SPOOL.md).
 
 ## Types
 

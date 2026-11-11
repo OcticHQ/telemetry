@@ -16,6 +16,9 @@ vocabulary_version: 1
 contract: airlock.agent-receipts.v1
 max_receipt_bytes: 4096
 max_receipts_per_run: 256
+# Characters (code points) in one attribute value, checked before its shape.
+# Airlock's orchestrator enforces the same limit (receipt.MaxAttributeValueLen).
+max_attribute_value_chars: 512
 
 # Every shape must stay RE2-safe (no lookaround, no backreferences): the orchestrator compiles them in Go.
 shapes:
