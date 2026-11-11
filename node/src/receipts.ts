@@ -15,6 +15,7 @@ import { request } from 'node:http';
 import { join } from 'node:path';
 
 import {
+  MAX_ATTRIBUTE_VALUE_CHARS,
   MAX_RECEIPT_BYTES,
   MAX_RECEIPTS_PER_RUN,
   RECEIPT_SHAPES,
@@ -62,6 +63,8 @@ const check = (type: string, attributes: Record<string, string | number>) => {
       return undefined;
     }
     const text = String(value);
+    // UTF-16 units, not code points: every shape is ASCII, so the two agree on anything a shape admits.
+    if (text.length > MAX_ATTRIBUTE_VALUE_CHARS) return undefined;
     if (COMPILED.get(shape)?.test(text) !== true) return undefined;
     checked[key] = text;
   }
