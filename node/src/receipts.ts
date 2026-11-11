@@ -6,12 +6,13 @@
  * to the spool directory as a file of its own inside the call, and drained
  * later by Airlock's orchestrator. Nothing here holds a type or key literal.
  *
- * `recordReceipt` and `sealedInput` never throw and warn once.
+ * `recordReceipt` and `sealedInput` never throw, and warn once per distinct
+ * problem through `process.emitWarning`, not `diag`: `diag` prints nothing
+ * unless `OCTIC_TELEMETRY_DEBUG=1`, and these run before or without `init()`.
  */
 import { closeSync, fsyncSync, openSync, renameSync, unlinkSync, writeSync } from 'node:fs';
 import { request } from 'node:http';
 import { join } from 'node:path';
-import { diag } from '@opentelemetry/api';
 
 import {
   MAX_RECEIPT_BYTES,
@@ -37,12 +38,12 @@ const COMPILED = new Map<string, RegExp>(
 const writerId = newWriterId();
 let seq = 0;
 let written = 0;
-let warned = false;
+const warned = new Set<string>();
 
 const warnOnce = (message: string): void => {
-  if (warned) return;
-  warned = true;
-  diag.warn(`octic-telemetry: ${message}`);
+  if (warned.has(message)) return;
+  warned.add(message);
+  process.emitWarning(`octic-telemetry: ${message}`);
 };
 
 /** The attributes as strings if they fit the vocabulary, else undefined. */
@@ -165,9 +166,9 @@ export function sealedInput(): Promise<Uint8Array | null> {
   });
 }
 
-/** For tests: forget the count and the one-time warning. */
+/** For tests: forget the count and the one-time warnings. */
 export const resetReceiptsForTests = (): void => {
   seq = 0;
   written = 0;
-  warned = false;
+  warned.clear();
 };

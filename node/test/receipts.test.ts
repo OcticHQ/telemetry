@@ -153,6 +153,30 @@ describe('recordReceipt', () => {
   });
 });
 
+describe('warnings', () => {
+  it('prints each distinct refusal once, without OCTIC_TELEMETRY_DEBUG', async () => {
+    delete process.env.OCTIC_TELEMETRY_DEBUG;
+    process.env.AIRLOCK_RUN_MODE = 'data_blind';
+    delete process.env.AIRLOCK_GATE_SOCKET;
+    const seen: string[] = [];
+    const listener = (warning: Error): void => {
+      seen.push(warning.message);
+    };
+    process.on('warning', listener);
+    try {
+      assert.equal(recordReceipt('not.a.type', {}), false);
+      assert.equal(recordReceipt('not.a.type', {}), false);
+      assert.equal(await sealedInput(), null);
+      await new Promise(resolve => setImmediate(resolve));
+    } finally {
+      process.off('warning', listener);
+    }
+    assert.equal(seen.length, 2);
+    assert.match(seen[0]!, /vocabulary/);
+    assert.match(seen[1]!, /AIRLOCK_GATE_SOCKET/);
+  });
+});
+
 describe('sealedInput', () => {
   const serve = async (): Promise<{ path: string; server: Server; dir: string }> => {
     const dir = await mkdtemp(join(tmpdir(), 'g-'));
