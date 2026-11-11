@@ -115,7 +115,7 @@ content policy.
 ## Receipts and sealed input (data-blind runs)
 
 An agent can state facts about its own run. Each receipt is checked against the
-vocabulary in [RECEIPTS.md](https://github.com/octic-labs/telemetry/blob/main/contract/RECEIPTS.md)
+vocabulary in [RECEIPTS.md](https://github.com/OcticHQ/telemetry/blob/main/contract/RECEIPTS.md)
 and written to the spool directory in the call; no `init()` is needed.
 
 ```ts
