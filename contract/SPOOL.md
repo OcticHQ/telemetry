@@ -127,8 +127,11 @@ Attribute values are strings, each matching its shape in RECEIPTS.md. A file is
 at most 4096 bytes. The writer writes it inside the call, fsyncs it and renames
 it from `.tmp`, so a file you can see is complete, and it stops after 256
 receipts per process. A receipt is written whenever the SDK resolves a safe
-spool directory, whether or not the span exporter is enabled. The content
-policy does not apply: the vocabulary replaces it.
+spool directory, whether or not the span exporter is enabled. When a directory
+is named — the spool's `dir`, else `OCTIC_SPOOL_DIR` — it is the only candidate:
+if it is unsafe the receipt is refused, never written further down the cascade
+where the reader that named it would not look. The content policy does not
+apply: the vocabulary replaces it.
 
 The bounds, eviction and age sweep above never touch a receipt, because all
 three match `*.otlp.json` only.
