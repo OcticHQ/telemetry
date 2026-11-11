@@ -41,7 +41,8 @@ _lock = threading.Lock()
 _writer_id = new_writer_id()
 _seq = 0
 _written = 0
-_warned = False
+#: Messages already warned, so each distinct problem warns once.
+_warned: set[str] = set()
 
 
 def _after_fork_in_child() -> None:
@@ -57,15 +58,14 @@ if hasattr(os, "register_at_fork"):
 
 
 def _reset_for_tests() -> None:
-    global _seq, _written, _warned
+    global _seq, _written
     _seq = _written = 0
-    _warned = False
+    _warned.clear()
 
 
 def _warn_once(message: str) -> None:
-    global _warned
-    if not _warned:
-        _warned = True
+    if message not in _warned:
+        _warned.add(message)
         log.warning("octichq-airlock-sdk: %s", message)
 
 
