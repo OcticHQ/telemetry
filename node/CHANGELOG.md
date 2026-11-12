@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.4.0](https://github.com/OcticHQ/telemetry/compare/node-v0.3.1...node-v0.4.0) (2026-11-12)
+
+
+### Features
+
+* **contract:** an agent receipt vocabulary and the spool's receipt files ([e344a48](https://github.com/OcticHQ/telemetry/commit/e344a48540307a6de69822ceb2cc719a8e814928))
+* **node:** record agent receipts and read the sealed input ([4aac174](https://github.com/OcticHQ/telemetry/commit/4aac17415d9619df3993d102b3ed6639b1ba73a3))
+
+
+### Bug Fixes
+
+* **contract:** an org shape Go's regexp can compile ([aa2daaf](https://github.com/OcticHQ/telemetry/commit/aa2daafe1b82a57bb09eab2424c40f6faad88145))
+* **node:** print receipt and sealed-input warnings without debug ([f062fb7](https://github.com/OcticHQ/telemetry/commit/f062fb70d49aacc022a8d5f9057acdeebf4c6d7f))
+* **node:** refuse a receipt value over 512 characters ([55e25db](https://github.com/OcticHQ/telemetry/commit/55e25db48af5b49e5b77d9d65cf4cf9b45a6250c))
+* **node:** refuse a receipt when the named spool directory is unsafe ([afa3e81](https://github.com/OcticHQ/telemetry/commit/afa3e811b3e96bb648e0dd93ec440498ea0f5ff5))
+
 ## [0.3.1](https://github.com/OcticHQ/telemetry/compare/node-v0.3.0...node-v0.3.1) (2026-10-27)
 
 
