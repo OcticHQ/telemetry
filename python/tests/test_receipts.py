@@ -1,21 +1,14 @@
-"""Agent receipts and the sealed input, checked against contract/SPOOL.md."""
+"""Agent receipts, checked against contract/SPOOL.md."""
 
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import socketserver
-import tempfile
-import threading
-from collections.abc import Iterator
-from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 import pytest
 
 from octichq_airlock_sdk import receipts
-from octichq_airlock_sdk.receipts import record_receipt, sealed_input
+from octichq_airlock_sdk.receipts import record_receipt
 from octichq_airlock_sdk.spool import ManifestInput, Spool, SpoolOptions
 
 DIGEST = "sha256:" + "a" * 64
@@ -146,79 +139,15 @@ def test_an_unsafe_configured_spool_is_false_even_when_spans_fell_through(
     spool.shutdown()
 
 
-# -- the sealed input -----------------------------------------------------------
-
-
-class _Handler(BaseHTTPRequestHandler):
-    def do_GET(self) -> None:
-        if self.path == "/v0/data/sealed":
-            self.send_response(200)
-            self.send_header("Content-Length", "6")
-            self.end_headers()
-            self.wfile.write(b"sealed")
-        else:
-            self.send_response(404)
-            self.send_header("Content-Length", "0")
-            self.end_headers()
-
-    def log_message(self, fmt: str, *args: object) -> None:
-        pass
-
-
-@pytest.fixture
-def gate() -> Iterator[str]:
-    # Unix socket paths are short on macOS; pytest's tmp_path is not.
-    directory = tempfile.mkdtemp(dir="/tmp")
-    path = os.path.join(directory, "g.sock")
-    server = socketserver.ThreadingUnixStreamServer(path, _Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    yield path
-    server.shutdown()
-    server.server_close()
-    shutil.rmtree(directory, ignore_errors=True)
-
-
-def test_sealed_input_reads_the_blob_from_the_gate(
-    gate: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
-    monkeypatch.setenv("AIRLOCK_GATE_SOCKET", gate)
-    assert sealed_input() == b"sealed"
-
-
-def test_sealed_input_is_none_without_data_blind(
-    gate: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("AIRLOCK_GATE_SOCKET", gate)
-    monkeypatch.delenv("AIRLOCK_RUN_MODE", raising=False)
-    assert sealed_input() is None
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "standard")
-    assert sealed_input() is None
-
-
-def test_sealed_input_is_none_when_the_gate_is_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
-    monkeypatch.delenv("AIRLOCK_GATE_SOCKET", raising=False)
-    assert sealed_input() is None
-    monkeypatch.setenv("AIRLOCK_GATE_SOCKET", str(tmp_path / "absent.sock"))
-    assert sealed_input() is None
-
-
 def test_each_distinct_refusal_warns_once(
-    spool_dir: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    spool_dir: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
-    monkeypatch.delenv("AIRLOCK_GATE_SOCKET", raising=False)
     with caplog.at_level("WARNING", logger="octichq_airlock_sdk"):
         assert record_receipt("not.a.type", {}) is False
         assert record_receipt("not.a.type", {}) is False
-        assert sealed_input() is None
     messages = [record.getMessage() for record in caplog.records]
-    assert len(messages) == 2
+    assert len(messages) == 1
     assert "vocabulary" in messages[0]
-    assert "AIRLOCK_GATE_SOCKET" in messages[1]
 
 
 def test_a_value_over_the_character_limit_is_refused(spool_dir: Path) -> None:

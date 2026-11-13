@@ -1,22 +1,21 @@
-"""Agent receipts and the sealed input.
+"""Agent receipts, for data-blind runs.
 
 A receipt is a short, structured statement an agent makes about its own run.
 It is checked against the generated vocabulary (``receipts_gen``), written to
 the spool directory as a file of its own inside the call, and drained later by
 Airlock's orchestrator. Nothing here holds a type or key literal.
 
-``record_receipt`` and ``sealed_input`` never raise and warn once.
+``record_receipt`` never raises and warns once. The sealed input lives in
+``gate``.
 """
 
 from __future__ import annotations
 
 import contextlib
-import http.client
 import json
 import logging
 import os
 import re
-import socket
 import threading
 import time
 from collections.abc import Mapping
@@ -145,43 +144,3 @@ def record_receipt(type: str, attributes: Mapping[str, str | int]) -> bool:  # n
     except Exception:  # noqa: BLE001 - the contract is that nothing escapes
         _warn_once("recording a receipt failed unexpectedly")
         return False
-
-
-class _GateConnection(http.client.HTTPConnection):
-    def __init__(self, path: str) -> None:
-        super().__init__("gate", timeout=30)
-        self._path = path
-
-    def connect(self) -> None:
-        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        sock.settimeout(self.timeout)
-        sock.connect(self._path)
-        self.sock = sock
-
-
-def sealed_input() -> bytes | None:
-    """The run's sealed input from the gate, or ``None``. Never raises.
-
-    Only a data-blind run has one: ``AIRLOCK_RUN_MODE`` must be ``data_blind``.
-    """
-    if os.environ.get("AIRLOCK_RUN_MODE") != "data_blind":
-        return None
-    path = os.environ.get("AIRLOCK_GATE_SOCKET")
-    if not path:
-        _warn_once("AIRLOCK_GATE_SOCKET is not set; no sealed input")
-        return None
-    try:
-        connection = _GateConnection(path)
-        try:
-            connection.request("GET", "/v0/data/sealed")
-            response = connection.getresponse()
-            data = response.read()
-            if response.status != 200:
-                _warn_once(f"the gate answered {response.status} for the sealed input")
-                return None
-            return data
-        finally:
-            connection.close()
-    except Exception:  # noqa: BLE001 - the contract is that nothing escapes
-        _warn_once("could not read the sealed input from the gate")
-        return None

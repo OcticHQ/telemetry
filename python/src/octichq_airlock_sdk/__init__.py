@@ -38,6 +38,7 @@ from .content import (
     resolve_policy,
     with_content,
 )
+from .gate import FetchResult, fetch_data, sealed_input
 from .identity import Identity, current_identity, with_identity
 from .otlp_json import encode_spans
 from .pipeline import (
@@ -49,7 +50,7 @@ from .pipeline import (
 )
 from .processor import OcticSpanProcessor
 from .prompt import Prompt, with_prompt
-from .receipts import record_receipt, sealed_input
+from .receipts import record_receipt
 from .redacting_exporter import RedactingSpanExporter
 from .run import Run, current_run_id, mint_run_id, with_run
 from .spool import SpoolOptions, SpoolStats
@@ -79,6 +80,7 @@ __all__ = [
     "ContentOptions",
     "ContentPolicy",
     "ExternalProviderTelemetry",
+    "FetchResult",
     "Identity",
     "OcticSpanProcessor",
     "Prompt",
@@ -95,6 +97,7 @@ __all__ = [
     "current_identity",
     "current_run_id",
     "encode_spans",
+    "fetch_data",
     "init",
     "init_with_external_provider",
     "mint_run_id",
