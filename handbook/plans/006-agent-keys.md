@@ -119,3 +119,12 @@ themselves are retried:
 
 The gate answers only 404 before the parameters arrive and 200 after them, so
 in practice the loop is a 404 plus transient blips.
+
+**The path is checked before the first poll.** On Linux, `connect()` to a
+regular file gives `ECONNREFUSED`, which is retried. So both SDKs stat
+`AIRLOCK_GATE_SOCKET` before the first poll, and a path that exists but is not
+a socket warns once (`ENOTSOCK`) and returns `null` / `None`. If the stat
+itself fails, the connection attempt decides, as before.
+
+No time limit of the SDK's own was added, on top of these fast failures. The
+orchestrator's deadline is the only overall limit, as Airlock's 047 D9 says.
