@@ -169,9 +169,16 @@ if (result.ok) {
 
 `fetchData` sends the request to the gate and waits up to 330 seconds for the
 exchange, then reads each entry the gate names, waiting up to 30 seconds for
-each. Both limits are how long it waits without hearing from the gate. It keeps no reference to the
-credentials once the request is written, zeroes the request buffer after
-sending it, and writes no warnings; the result is the report. A refusal from
+each. Both limits are how long it waits without hearing from the gate. It
+writes no warnings; the result is the report.
+
+The SDK keeps no copy of the credentials once the request is written. It
+zeroes the bytes it sent, but JavaScript cannot wipe a string, so the JSON text
+built along the way stays in memory until it is garbage-collected. Your agent
+still holds its own copy, in the opened parameters: drop it once `fetchData`
+returns.
+
+A refusal from
 the gate passes its token through as `reason` (for example `malformed`,
 `already_fetched`, or the exchange's own refusal token). The SDK's own reasons:
 
