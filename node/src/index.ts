@@ -62,7 +62,8 @@ export { OcticSpanProcessor } from './processor.ts';
 // a consumer only sees the deprecation notice if the old name still resolves.
 // eslint-disable-next-line @typescript-eslint/no-deprecated
 export { IdentitySpanProcessor } from './processor.ts';
-export { recordReceipt, sealedInput } from './receipts.ts';
+export { fetchData, sealedInput, type FetchRequest, type FetchResult } from './gate.ts';
+export { recordReceipt } from './receipts.ts';
 export { RedactingSpanExporter } from './redacting-exporter.ts';
 export { RedactingLogRecordProcessor } from './redacting-log-processor.ts';
 export { SpoolingLogRecordExporter, SpoolingSpanExporter } from './spool-exporter.ts';
