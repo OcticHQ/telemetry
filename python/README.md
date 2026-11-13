@@ -141,11 +141,15 @@ else:
 
 `fetch_data` sends the request to the gate and waits up to 330 seconds without
 hearing from it for the exchange, then reads each entry the gate names, waiting
-up to 30 seconds without hearing from the gate for each. It keeps no reference to
-the credentials once the request body is written, zeroes the request buffer
-after sending it, and logs nothing; the result is the report.
-`FetchResult` is a frozen dataclass: `ok`, `entries` (empty when refused) and
-`reason` (`None` when `ok`).
+up to 30 seconds without hearing from the gate for each. It logs nothing; the
+result is the report. `FetchResult` is a frozen dataclass: `ok`, `entries`
+(empty when refused) and `reason` (`None` when `ok`).
+
+The SDK keeps no copy of the credentials once the request is written. It
+zeroes the bytes it sent, but Python cannot wipe a `str` or `bytes`, so the
+JSON text built along the way stays in memory until it is garbage-collected.
+Your agent still holds its own copy, in the opened parameters: drop it once
+`fetch_data` returns.
 
 A refusal from the gate passes its token through as `reason`: for example
 `malformed`, `already_fetched`, or the exchange's own refusal token. The SDK's
