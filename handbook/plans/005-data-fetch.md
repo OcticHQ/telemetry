@@ -107,3 +107,22 @@ release separately.
    tests and README.
 3. `feat(python)`: the same for `fetch_data`.
 4. The Release PRs, one at a time. Nobody edits a version by hand.
+
+## Amendments
+
+**Settled in review.** Node and Python give the same reason for the same input:
+
+- `malformed` is also returned, without contacting the gate, for a range missing
+  `from` or `to` and for a body over 64 KiB. The gate's `MaxBytesReader` answers
+  413 early and can reset the connection, which would otherwise read as
+  `gate_unreachable`.
+- A refusal body is decoded as strict UTF-8 with the BOM kept, and only
+  `[ \t\r\n]` is trimmed from its edges. A body that fails to decode is
+  `gate_error`.
+- The 200 body is decoded as strict UTF-8 before it is parsed. A name that
+  cannot be URL-encoded is `read_failed`.
+- Each request opens its own connection, including in Node (`agent: false`).
+- The timeouts are idle timeouts: how long the SDK waits without hearing from
+  the gate.
+- Python's `fetch_data` drops its arguments before any I/O, as Node's
+  `fetchData` does by not being async.
