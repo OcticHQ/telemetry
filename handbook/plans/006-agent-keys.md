@@ -102,3 +102,20 @@ passes that token through.
 3. `feat(python)`.
 4. A PR stacked on 005's #69. Nothing merges or releases without the user's
    go-ahead.
+
+## Amendments
+
+**The sealed input's retry, narrowed with Airlock.** Only answers that can fix
+themselves are retried:
+
+- A 404 is retried silently.
+- Connection refused, a reset, the 30-second idle timeout and any 5xx are
+  retried, with a warning once per distinct problem.
+- If the socket path does not exist (ENOENT) on the first attempt, the call
+  warns once and returns `null` / `None` straight away. That is a
+  misconfiguration. An ENOENT on a later attempt is retried.
+- Any other 4xx (400, 403, 405, 410, …) warns once and returns `null` / `None`
+  straight away.
+
+The gate answers only 404 before the parameters arrive and 200 after them, so
+in practice the loop is a 404 plus transient blips.
