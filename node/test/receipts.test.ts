@@ -1,16 +1,14 @@
 /**
- * Agent receipts and the sealed input, checked against contract/SPOOL.md.
+ * Agent receipts, checked against contract/SPOOL.md.
  *
  *   node --test test/receipts.test.ts
  */
 import assert from 'node:assert/strict';
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
-import { createServer, type Server } from 'node:http';
-import { tmpdir } from 'node:os';
+import { chmod, mkdir, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 
-import { recordReceipt, resetReceiptsForTests, sealedInput } from '../src/receipts.ts';
+import { recordReceipt, resetReceiptsForTests } from '../src/receipts.ts';
 import { resolveSpoolOptions, Spool } from '../src/spool.ts';
 import { withSpoolDir } from './support/harness.ts';
 
@@ -172,8 +170,6 @@ describe('the character limit', () => {
 describe('warnings', () => {
   it('prints each distinct refusal once, without OCTIC_TELEMETRY_DEBUG', async () => {
     delete process.env.OCTIC_TELEMETRY_DEBUG;
-    process.env.AIRLOCK_RUN_MODE = 'data_blind';
-    delete process.env.AIRLOCK_GATE_SOCKET;
     const seen: string[] = [];
     const listener = (warning: Error): void => {
       seen.push(warning.message);
@@ -182,61 +178,11 @@ describe('warnings', () => {
     try {
       assert.equal(recordReceipt('not.a.type', {}), false);
       assert.equal(recordReceipt('not.a.type', {}), false);
-      assert.equal(await sealedInput(), null);
       await new Promise(resolve => setImmediate(resolve));
     } finally {
       process.off('warning', listener);
     }
-    assert.equal(seen.length, 2);
+    assert.equal(seen.length, 1);
     assert.match(seen[0]!, /vocabulary/);
-    assert.match(seen[1]!, /AIRLOCK_GATE_SOCKET/);
-  });
-});
-
-describe('sealedInput', () => {
-  const serve = async (): Promise<{ path: string; server: Server; dir: string }> => {
-    const dir = await mkdtemp(join(tmpdir(), 'g-'));
-    const path = join(dir, 'g.sock');
-    const server = createServer((req, res) => {
-      if (req.url === '/v0/data/sealed') res.end('sealed');
-      else {
-        res.statusCode = 404;
-        res.end();
-      }
-    });
-    await new Promise<void>(resolve => server.listen(path, resolve));
-    return { path, server, dir };
-  };
-
-  it('reads the blob from the gate socket', async () => {
-    const { path, server, dir } = await serve();
-    try {
-      process.env.AIRLOCK_RUN_MODE = 'data_blind';
-      process.env.AIRLOCK_GATE_SOCKET = path;
-      const blob = await sealedInput();
-      assert.equal(new TextDecoder().decode(blob!), 'sealed');
-    } finally {
-      server.close();
-      await rm(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('is null without data_blind, without a socket, and on a dead socket', async () => {
-    const { path, server, dir } = await serve();
-    try {
-      process.env.AIRLOCK_GATE_SOCKET = path;
-      delete process.env.AIRLOCK_RUN_MODE;
-      assert.equal(await sealedInput(), null);
-      process.env.AIRLOCK_RUN_MODE = 'standard';
-      assert.equal(await sealedInput(), null);
-      process.env.AIRLOCK_RUN_MODE = 'data_blind';
-      delete process.env.AIRLOCK_GATE_SOCKET;
-      assert.equal(await sealedInput(), null);
-      process.env.AIRLOCK_GATE_SOCKET = join(dir, 'absent.sock');
-      assert.equal(await sealedInput(), null);
-    } finally {
-      server.close();
-      await rm(dir, { recursive: true, force: true });
-    }
   });
 });

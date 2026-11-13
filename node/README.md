@@ -112,24 +112,85 @@ Airlock records its own copy of the run id alongside your spans either way.
 Whatever a wrapped function returns is recorded as its output, subject to the
 content policy.
 
-## Receipts and sealed input (data-blind runs)
+## Airlock runs: receipts, sealed input and data fetch
 
-An agent can state facts about its own run. Each receipt is checked against the
-vocabulary in [RECEIPTS.md](https://github.com/OcticHQ/telemetry/blob/main/contract/RECEIPTS.md)
-and written to the spool directory in the call; no `init()` is needed.
+None of these need `init()`, and none of them throw or reject.
+
+### Receipts (data-blind runs)
+
+In a data-blind run an agent can state facts about its own run. Each receipt is
+checked against the vocabulary in
+[RECEIPTS.md](https://github.com/OcticHQ/telemetry/blob/main/contract/RECEIPTS.md)
+and written to the spool directory in the call.
 
 ```ts
-import { recordReceipt, sealedInput } from '@octichq/airlock-sdk';
+import { recordReceipt } from '@octichq/airlock-sdk';
 
-const ok = recordReceipt('input.read', { 'airlock.bytes': 1024 }); // false, never throws, if refused
-
-const blob = await sealedInput(); // Uint8Array, or null
+const ok = recordReceipt('input.read', { 'airlock.bytes': 1024 }); // false if refused
 ```
 
 `recordReceipt` returns `false` for a type or attribute off the vocabulary, a
 missing required attribute, a bad value, an unwritable spool, or a 257th receipt.
+
+### Sealed input (data-blind and data-fetch runs)
+
+```ts
+import { sealedInput } from '@octichq/airlock-sdk';
+
+const blob = await sealedInput(); // Uint8Array, or null
+```
+
 `sealedInput()` returns the run's sealed input from the gate when
-`AIRLOCK_RUN_MODE=data_blind`, and `null` otherwise.
+`AIRLOCK_RUN_MODE` is `data_blind` or `data_fetch`, and `null` otherwise.
+
+### Data fetch (data-fetch runs)
+
+In a data-fetch run the agent opens its sealed parameters, hands the FIU's
+credentials to the gate, and reads back what the gate fetched.
+
+```ts
+import { fetchData, sealedInput } from '@octichq/airlock-sdk';
+
+// The sealed input is sealed to your agent's key; opening it is your code.
+// The field names here follow Airlock's test contract. The FIU and your agent
+// agree the real layout.
+const params = openSealedParameters(await sealedInput());
+const result = await fetchData({
+  credentials: params.aa_credentials, // passed through unchanged
+  consentId: params.consent_id,
+  fiDataRange: params.fi_data_range, // { from, to }, RFC 3339
+});
+if (result.ok) {
+  for (const [name, bytes] of result.entries) handle(name, bytes);
+} else {
+  console.error(`fetch refused: ${result.reason}`);
+}
+```
+
+`fetchData` sends the request to the gate and waits up to 330 seconds for the
+exchange, then reads each entry the gate names, waiting up to 30 seconds for
+each. Both limits are how long it waits without hearing from the gate. It
+writes no warnings; the result is the report.
+
+The SDK keeps no copy of the credentials once the request is written. It
+zeroes the bytes it sent, but JavaScript cannot wipe a string, so the JSON text
+built along the way stays in memory until it is garbage-collected. Your agent
+still holds its own copy, in the opened parameters: drop it once `fetchData`
+returns.
+
+A refusal from
+the gate passes its token through as `reason` (for example `malformed`,
+`already_fetched`, or the exchange's own refusal token). The SDK's own reasons:
+
+| `reason` | When |
+|---|---|
+| `not_data_fetch` | `AIRLOCK_RUN_MODE` is not `data_fetch`; the gate is not contacted |
+| `no_gate` | `AIRLOCK_GATE_SOCKET` is unset or empty |
+| `malformed` | the request cannot be serialized as JSON, is over 64 KiB, or the range lacks `from` or `to` (the gate is not contacted); also the gate's own token for a request it rejects |
+| `unsupported` | the gate does not offer a data fetch (an older orchestrator, or another run mode) |
+| `gate_unreachable` | the request fails to connect, errors, or times out |
+| `gate_error` | an internal gate error, an unexpected status, or a refusal that is not a token |
+| `read_failed` | the gate's answer is not a list of names, or reading an entry fails |
 
 ## Content policy
 
