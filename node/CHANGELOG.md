@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/OcticHQ/telemetry/compare/node-v0.4.0...node-v0.5.0) (2026-11-19)
+
+
+### Features
+
+* **node:** add fetchData for Airlock's data-fetch runs ([30b0731](https://github.com/OcticHQ/telemetry/commit/30b073132776fbaae72b486cdb849173df1ae08a))
+
 ## [0.4.0](https://github.com/OcticHQ/telemetry/compare/node-v0.3.1...node-v0.4.0) (2026-11-12)
 
 
