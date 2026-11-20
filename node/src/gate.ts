@@ -1,10 +1,11 @@
 /**
  * Calls to Airlock's gate over `$AIRLOCK_GATE_SOCKET`.
  *
- * `attestKey` attests the agent's own public key in a data-blind or data-fetch
- * run. `sealedInput` then waits for the run's sealed parameters, which the FIU
- * seals to that key. `fetchData` hands the FIU's credentials to the gate in a
- * data-fetch run and reads back the vault entries the orchestrator fetched.
+ * `attestKey` attests the agent's own public key in a data-blind run.
+ * `sealedInput` then waits for the run's sealed parameters, which the FIU
+ * seals to that key. `fetchData` hands the FIU's credentials, which the agent
+ * carries in its own image, to the gate in a data-fetch run and reads back the
+ * vault entries the orchestrator fetched.
  *
  * None of them throws or rejects. `sealedInput` warns once per distinct problem
  * through `process.emitWarning`; `attestKey` and `fetchData` write no
@@ -110,10 +111,8 @@ const call = (
     }
   });
 
-const sealedRun = (): boolean => {
-  const mode = process.env.AIRLOCK_RUN_MODE;
-  return mode === 'data_blind' || mode === 'data_fetch';
-};
+// Only a data-blind run is sealed: a data-fetch agent carries its credentials.
+const sealedRun = (): boolean => process.env.AIRLOCK_RUN_MODE === 'data_blind';
 
 const gateSocket = (): string | undefined => {
   const socketPath = process.env.AIRLOCK_GATE_SOCKET;
@@ -121,9 +120,9 @@ const gateSocket = (): string | undefined => {
 };
 
 /**
- * The run's sealed input from the gate, or null. Never rejects. Data-blind and
- * data-fetch runs have one: `AIRLOCK_RUN_MODE` must be `data_blind` or
- * `data_fetch`, else this is null straight away.
+ * The run's sealed input from the gate, or null. Never rejects. Only a
+ * data-blind run has one: `AIRLOCK_RUN_MODE` must be `data_blind`, else this
+ * is null straight away.
  *
  * The FIU seals the input to the agent's attested key, so it arrives after the
  * run starts. This polls every 2 seconds until the gate answers 200, with no
@@ -179,11 +178,12 @@ export async function sealedInput(): Promise<Uint8Array | null> {
 }
 
 export interface FetchRequest {
-  /** The object found inside the sealed parameters, passed through unchanged. */
+  /** The FIU's `airlock.rebit.credentials.v1` object, passed through unchanged. */
   credentials: unknown;
-  consentId: string;
-  /** RFC 3339 timestamps. */
-  fiDataRange: { from: string; to: string };
+  /** Optional: omitted means the run's. If given, it must equal the run's. */
+  consentId?: string | undefined;
+  /** RFC 3339 timestamps. Optional, as `consentId`. */
+  fiDataRange?: { from: string; to: string } | undefined;
 }
 
 export type FetchResult =
@@ -258,15 +258,20 @@ export function fetchData(fetchRequest: FetchRequest): Promise<FetchResult> {
     let body: Buffer;
     try {
       const { credentials, consentId, fiDataRange } = fetchRequest;
-      // JSON.stringify would drop a missing field silently; refuse it here instead.
-      const { from, to } = fiDataRange as Partial<FetchRequest['fiDataRange']>;
-      if (from === undefined || to === undefined) return Promise.resolve(refused('malformed'));
+      // Omitted (undefined or null) is absent on the wire, never null.
+      let range: { from: string; to: string } | undefined;
+      if (fiDataRange != null) {
+        // JSON.stringify would drop a missing bound silently; refuse it here instead.
+        const { from, to } = fiDataRange as Partial<NonNullable<FetchRequest['fiDataRange']>>;
+        if (from === undefined || to === undefined) return Promise.resolve(refused('malformed'));
+        range = { from, to };
+      }
       body = Buffer.from(
         JSON.stringify({
           schema: 'airlock.fetch.request.v1',
           credentials,
-          consent_id: consentId,
-          fi_data_range: { from, to },
+          ...(consentId != null && { consent_id: consentId }),
+          ...(range && { fi_data_range: range }),
         }),
       );
     } catch {
