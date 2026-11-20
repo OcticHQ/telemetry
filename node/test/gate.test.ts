@@ -129,15 +129,13 @@ afterEach(() => {
 });
 
 describe('sealedInput', () => {
-  it('reads the blob from the gate socket in data_blind and data_fetch runs', POLLS, async () => {
+  it('reads the blob from the gate socket in a data_blind run', POLLS, async () => {
     const g = await gate(sealedOnly);
     try {
       process.env.AIRLOCK_GATE_SOCKET = g.path;
-      for (const mode of ['data_blind', 'data_fetch']) {
-        process.env.AIRLOCK_RUN_MODE = mode;
-        const blob = await sealedInput();
-        assert.equal(new TextDecoder().decode(blob!), 'sealed', mode);
-      }
+      process.env.AIRLOCK_RUN_MODE = 'data_blind';
+      const blob = await sealedInput();
+      assert.equal(new TextDecoder().decode(blob!), 'sealed');
     } finally {
       await g.close();
     }
@@ -149,8 +147,10 @@ describe('sealedInput', () => {
       process.env.AIRLOCK_GATE_SOCKET = g.path;
       delete process.env.AIRLOCK_RUN_MODE;
       assert.equal(await sealedInput(), null);
-      process.env.AIRLOCK_RUN_MODE = 'standard';
-      assert.equal(await sealedInput(), null);
+      for (const mode of ['standard', 'data_fetch']) {
+        process.env.AIRLOCK_RUN_MODE = mode;
+        assert.equal(await sealedInput(), null, mode);
+      }
       assert.equal(g.seen.length, 0);
       process.env.AIRLOCK_RUN_MODE = 'data_blind';
       delete process.env.AIRLOCK_GATE_SOCKET;
@@ -219,7 +219,7 @@ describe('sealedInput waiting for its parameters', () => {
   it('retries a 5xx, warning once and never with the body', POLLS, async () => {
     const g = await gate(inTurn(503));
     try {
-      process.env.AIRLOCK_RUN_MODE = 'data_fetch';
+      process.env.AIRLOCK_RUN_MODE = 'data_blind';
       process.env.AIRLOCK_GATE_SOCKET = g.path;
       let blob: Uint8Array | null = null;
       const warnings = await warningsDuring(async () => {
@@ -444,17 +444,16 @@ describe('attestKey', () => {
       process.env.AIRLOCK_GATE_SOCKET = g.path;
       const forms: [string, Uint8Array | ArrayBuffer][] = [
         ['data_blind', KEY],
-        ['data_fetch', KEY],
-        ['data_fetch', KEY.slice().buffer], // webcrypto's exportKey('raw')
+        ['data_blind', KEY.slice().buffer], // webcrypto's exportKey('raw')
         [
-          'data_fetch',
+          'data_blind',
           runInNewContext('Uint8Array.from({ length: 32 }, (_, i) => i).buffer') as ArrayBuffer,
         ],
         [
-          'data_fetch',
+          'data_blind',
           runInNewContext('Uint8Array.from({ length: 32 }, (_, i) => i)') as Uint8Array,
         ],
-        ['data_fetch', new Uint8Array([9, ...KEY, 9]).subarray(1, 33)],
+        ['data_blind', new Uint8Array([9, ...KEY, 9]).subarray(1, 33)],
       ];
       for (const [mode, key] of forms) {
         process.env.AIRLOCK_RUN_MODE = mode;
@@ -520,7 +519,7 @@ describe('attestKey', () => {
     const g = await gate(() => ({ body: JSON.stringify(ATTESTED) }));
     try {
       process.env.AIRLOCK_GATE_SOCKET = g.path;
-      for (const mode of [undefined, 'standard']) {
+      for (const mode of [undefined, 'standard', 'data_fetch']) {
         if (mode === undefined) delete process.env.AIRLOCK_RUN_MODE;
         else process.env.AIRLOCK_RUN_MODE = mode;
         assert.deepEqual(await attestKey(KEY), { ok: false, reason: 'not_sealed_run' });
@@ -549,7 +548,7 @@ describe('attestKey', () => {
       const short = KEY.subarray(1);
       process.env.AIRLOCK_RUN_MODE = 'standard';
       assert.deepEqual(await attestKey(short), { ok: false, reason: 'not_sealed_run' });
-      process.env.AIRLOCK_RUN_MODE = 'data_fetch';
+      process.env.AIRLOCK_RUN_MODE = 'data_blind';
       assert.deepEqual(await attestKey(short), { ok: false, reason: 'no_gate' });
       assert.deepEqual(await attestKey(KEY), { ok: false, reason: 'no_gate' });
       process.env.AIRLOCK_GATE_SOCKET = '';
@@ -598,6 +597,31 @@ describe('fetchData', () => {
     }
   });
 
+  it('sends the credentials alone when the consent and range are omitted', async () => {
+    const g = await gate(() => ({ body: '{"names":[]}' }));
+    try {
+      process.env.AIRLOCK_RUN_MODE = 'data_fetch';
+      process.env.AIRLOCK_GATE_SOCKET = g.path;
+      const omitted = [
+        { credentials: CREDENTIALS },
+        { credentials: CREDENTIALS, consentId: undefined, fiDataRange: undefined },
+        { credentials: CREDENTIALS, consentId: null, fiDataRange: null } as unknown as FetchRequest,
+      ];
+      for (const request of omitted) {
+        assert.deepEqual(await fetchData(request), { ok: true, entries: new Map() });
+      }
+      assert.deepEqual(await fetchData({ credentials: CREDENTIALS, consentId: 'c' }), {
+        ok: true,
+        entries: new Map(),
+      });
+      const bodies = g.seen.map(({ body }) => JSON.parse(body) as unknown);
+      const alone = { schema: 'airlock.fetch.request.v1', credentials: CREDENTIALS };
+      assert.deepEqual(bodies, [alone, alone, alone, { ...alone, consent_id: 'c' }]);
+    } finally {
+      await g.close();
+    }
+  });
+
   it('turns each refusal into its reason', async () => {
     const g = await gate(() => ({}));
     try {
@@ -614,6 +638,7 @@ describe('fetchData', () => {
         [422, Buffer.from([0x66, 0xff]), 'gate_error'],
         [413, 'malformed\n', 'malformed'],
         [422, 'consent_expired\n', 'consent_expired'],
+        [422, 'input_disagrees\n', 'input_disagrees'],
         [422, 'Not A Token\n', 'gate_error'],
         [500, 'fetch failed\n', 'gate_error'],
         [503, 'busy\n', 'gate_error'],
