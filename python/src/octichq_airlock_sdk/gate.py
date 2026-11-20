@@ -1,4 +1,4 @@
-"""The gate: the key attestation, the sealed input and the data fetch.
+"""The gate: the key attestation and sealed input (data-blind), and the data fetch.
 
 All three speak HTTP to Airlock's gate over the unix socket at
 ``AIRLOCK_GATE_SOCKET``. ``sealed_input`` never raises and warns once per
@@ -40,7 +40,8 @@ _READ_TIMEOUT = 30
 _ATTEST_TIMEOUT = 60
 #: Between polls for the sealed input. Tests shorten it.
 _POLL_INTERVAL = 2.0
-_SEALED_MODES = ("data_blind", "data_fetch")
+#: Only a data-blind run is sealed: a data-fetch agent carries its credentials.
+_SEALED_MODES = ("data_blind",)
 #: Failures the sealed input always retries. RemoteDisconnected is a reset, and
 #: a truncated answer (IncompleteRead) is treated as one.
 _TRANSIENT = (
@@ -121,8 +122,8 @@ def _json(data: bytes) -> Any:
 def sealed_input() -> bytes | None:
     """The run's sealed input from the gate, or ``None``. Never raises.
 
-    Data-blind and data-fetch runs have one: ``AIRLOCK_RUN_MODE`` must be
-    ``data_blind`` or ``data_fetch``. It arrives after the agent attests its
+    Only a data-blind run has one: ``AIRLOCK_RUN_MODE`` must be
+    ``data_blind``. It arrives after the agent attests its
     key, so this waits for it, polling every 2 seconds with no limit of its
     own; the orchestrator's deadline ends the run. A 404, a 5xx, a refused or
     reset connection (or a truncated answer) and a timeout are retried. It gives up with ``None`` on
@@ -195,7 +196,7 @@ class AttestResult:
 def attest_key(public_key: bytes) -> AttestResult:
     """Attests the agent's X25519 public key through the gate.
 
-    Only a data-blind or data-fetch run can. The FIU seals the run's parameters
+    Only a data-blind run can. The FIU seals the run's parameters
     to this key, so call it before ``sealed_input``. Pass the raw 32-byte public
     half; the SDK never sees the private key. Never raises and logs nothing.
     """
@@ -262,14 +263,20 @@ def _refused(reason: str) -> FetchResult:
 
 
 def fetch_data(
-    *, credentials: Mapping[str, Any], consent_id: str, fi_data_range: Mapping[str, str]
+    *,
+    credentials: Mapping[str, Any],
+    consent_id: str | None = None,
+    fi_data_range: Mapping[str, str] | None = None,
 ) -> FetchResult:
     """Hands the FIU's credentials to the gate and reads back the fetched data.
 
     Only a data-fetch run can: ``AIRLOCK_RUN_MODE`` must be ``data_fetch``.
-    Never raises and logs nothing. ``credentials`` is the object from the
-    sealed parameters, passed through unchanged; nothing keeps it after the
-    request body is written, and no reason ever includes it.
+    Never raises and logs nothing. ``credentials`` is the FIU's
+    ``airlock.rebit.credentials.v1`` object, which the agent carries in its
+    image, passed through unchanged; nothing keeps it after the request body is
+    written, and no reason ever includes it. ``consent_id`` and
+    ``fi_data_range`` are optional: ``None`` sends neither, and the run's are
+    used; given, they must equal the run's.
     """
     try:
         if os.environ.get("AIRLOCK_RUN_MODE") != "data_fetch":
@@ -278,17 +285,21 @@ def fetch_data(
         if not path:
             return _refused("no_gate")
         try:
+            request: dict[str, Any] = {
+                "schema": "airlock.fetch.request.v1",
+                "credentials": dict(credentials),
+            }
+            # Omitted is absent on the wire, never null.
+            if consent_id is not None:
+                request["consent_id"] = consent_id
+            if fi_data_range is not None:
+                request["fi_data_range"] = {
+                    "from": fi_data_range["from"],
+                    "to": fi_data_range["to"],
+                }
             body = bytearray(
                 json.dumps(
-                    {
-                        "schema": "airlock.fetch.request.v1",
-                        "credentials": dict(credentials),
-                        "consent_id": consent_id,
-                        "fi_data_range": {
-                            "from": fi_data_range["from"],
-                            "to": fi_data_range["to"],
-                        },
-                    },
+                    request,
                     separators=(",", ":"),
                     allow_nan=False,
                 ).encode()
@@ -296,7 +307,7 @@ def fetch_data(
         except (TypeError, ValueError, LookupError):
             return _refused("malformed")
         # Nothing that waits on the gate holds the inputs; only the body, which is zeroed.
-        del credentials, consent_id, fi_data_range
+        del credentials, consent_id, fi_data_range, request
         if len(body) > _MAX_REQUEST_BYTES:
             body[:] = bytes(len(body))
             return _refused("malformed")
