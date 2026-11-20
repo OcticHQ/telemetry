@@ -126,3 +126,18 @@ release separately.
   the gate.
 - Python's `fetch_data` drops its arguments before any I/O, as Node's
   `fetchData` does by not being async.
+
+**Credentials in the image, and nothing sealed (2026-11-19).** Airlock's ADR
+0029 and plan 052 D8 take `data_fetch` out of the sealed modes. The agent
+carries the FIU's AA credentials in its image and picks the set by
+`AIRLOCK_ENVIRONMENT` (`sandbox` or `production`). The consent and range come
+from the FIU's signed start call.
+
+- `fetchData` / `fetch_data` take the credentials alone. `consentId` /
+  `consent_id` and `fiDataRange` / `fi_data_range` are optional. Omitted (or
+  null / `None`), they are left out of the request, never sent as null. If they
+  are sent, they must equal the run's, or the gate refuses with
+  `input_disagrees`.
+- `attestKey` / `attest_key` and `sealedInput` / `sealed_input` serve
+  `data_blind` only (006). In `data_fetch` they are `not_sealed_run` and
+  `null` / `None`, and touch no socket.

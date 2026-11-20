@@ -112,7 +112,7 @@ Airlock records its own copy of the run id alongside your spans either way.
 Whatever a wrapped function returns is recorded as its output, subject to the
 content policy.
 
-## Airlock runs: receipts, sealed input and data fetch
+## Airlock runs: agent key, sealed input, data fetch and receipts
 
 None of these need `init()`, and none of them throw or reject.
 
@@ -132,7 +132,52 @@ const ok = recordReceipt('input.read', { 'airlock.bytes': 1024 }); // false if r
 `recordReceipt` returns `false` for a type or attribute off the vocabulary, a
 missing required attribute, a bad value, an unwritable spool, or a 257th receipt.
 
-### Sealed input (data-blind and data-fetch runs)
+### The order (data-blind runs)
+
+The FIU seals the run's parameters to a key your agent makes at start, so a
+data-blind agent begins:
+
+1. Make an X25519 key pair with your own HPKE library. The SDK neither makes
+   nor holds the private key.
+2. `attestKey(publicKey)`. If it is refused, end the run with its `reason`.
+3. `sealedInput()`, which waits until the FIU's parameters arrive.
+4. Open them: HPKE base mode, X25519-HKDF-SHA256 / HKDF-SHA256 /
+   ChaCha20Poly1305, no AAD, with the info
+   `airlock.agent-params.v1|<AIRLOCK_RUN_ID>|<AIRLOCK_MANIFEST_DIGEST>`.
+
+### Agent key
+
+```ts
+import { attestKey } from '@octichq/airlock-sdk';
+
+// The raw 32-byte X25519 public key: a Uint8Array, or the ArrayBuffer that
+// webcrypto's exportKey('raw', key) returns.
+const attested = await attestKey(publicKey);
+if (!attested.ok) {
+  console.error(`attestation refused: ${attested.reason}`);
+  process.exit(1);
+}
+// attested.keyId, attested.bundle, attested.attestation.{mode,token}
+```
+
+`attestKey` sends only the public key. The gate quotes it and has Airlock list
+it before answering, so it waits up to 60 seconds without hearing from the
+gate. It writes no warnings; the result is the report. A refusal from the gate
+passes its token through as `reason`. The reasons:
+
+| `reason` | When |
+|---|---|
+| `not_sealed_run` | `AIRLOCK_RUN_MODE` is not `data_blind`; the gate is not contacted |
+| `no_gate` | `AIRLOCK_GATE_SOCKET` is unset or empty |
+| `malformed` | the key is not 32 bytes in a `Uint8Array` or `ArrayBuffer` (the gate is not contacted); also the gate's token for a request it rejects, which does not use up the run's attestation |
+| `already_attested` | another key is already attested on this run. Stop |
+| `attest_failed` | the quote or the listing failed, and the run is halting |
+| `unsupported` | the gate does not offer attestation (an older orchestrator, or another run mode) |
+| `gate_unreachable` | the request fails to connect, errors, or times out |
+| `gate_error` | an internal gate error, an unexpected status, or a refusal that is not a token |
+| `read_failed` | the gate's answer is not a key id, a bundle and an attestation |
+
+### Sealed input (data-blind runs)
 
 ```ts
 import { sealedInput } from '@octichq/airlock-sdk';
@@ -140,25 +185,31 @@ import { sealedInput } from '@octichq/airlock-sdk';
 const blob = await sealedInput(); // Uint8Array, or null
 ```
 
-`sealedInput()` returns the run's sealed input from the gate when
-`AIRLOCK_RUN_MODE` is `data_blind` or `data_fetch`, and `null` otherwise.
+When `AIRLOCK_RUN_MODE` is `data_blind`, `sealedInput()` waits
+for the run's sealed input: it asks the gate every 2 seconds until the
+parameters arrive, with no limit of its own, since Airlock's deadline stops
+the run. A refused or reset connection, a timeout, or a gate error (5xx) is
+retried, with a warning once per distinct problem. It returns `null` straight
+away in any other mode, and, with a warning, without `AIRLOCK_GATE_SOCKET`, if
+the socket does not exist, is not a socket or cannot be used on the first try, or if the gate
+answers with any status other than 200, 404 or a 5xx.
 
 ### Data fetch (data-fetch runs)
 
-In a data-fetch run the agent opens its sealed parameters, hands the FIU's
-credentials to the gate, and reads back what the gate fetched.
+In a data-fetch run the agent carries the FIU's AA credentials in its own
+image, one set per environment, and picks the set for its run from
+`AIRLOCK_ENVIRONMENT` (`sandbox` or `production`). It hands them to the gate
+and reads back what the gate fetched. Nothing is sealed to the agent, so it
+calls neither `attestKey` nor `sealedInput`.
 
 ```ts
-import { fetchData, sealedInput } from '@octichq/airlock-sdk';
+import { readFileSync } from 'node:fs';
+import { fetchData } from '@octichq/airlock-sdk';
 
-// The sealed input is sealed to your agent's key; opening it is your code.
-// The field names here follow Airlock's test contract. The FIU and your agent
-// agree the real layout.
-const params = openSealedParameters(await sealedInput());
+// Where the file lives and how it is laid out is your image's choice.
+const sets = JSON.parse(readFileSync('/etc/agent/credentials.json', 'utf8'));
 const result = await fetchData({
-  credentials: params.aa_credentials, // passed through unchanged
-  consentId: params.consent_id,
-  fiDataRange: params.fi_data_range, // { from, to }, RFC 3339
+  credentials: sets[process.env.AIRLOCK_ENVIRONMENT!], // airlock.rebit.credentials.v1, unchanged
 });
 if (result.ok) {
   for (const [name, bytes] of result.entries) handle(name, bytes);
@@ -175,18 +226,23 @@ writes no warnings; the result is the report.
 The SDK keeps no copy of the credentials once the request is written. It
 zeroes the bytes it sent, but JavaScript cannot wipe a string, so the JSON text
 built along the way stays in memory until it is garbage-collected. Your agent
-still holds its own copy, in the opened parameters: drop it once `fetchData`
-returns.
+still holds its own copy: drop it once `fetchData` returns.
 
-A refusal from
-the gate passes its token through as `reason` (for example `malformed`,
-`already_fetched`, or the exchange's own refusal token). The SDK's own reasons:
+The orchestrator fetches with the consent and range the FIU signed when it
+started the run. `consentId` and `fiDataRange` (`{ from, to }`, RFC 3339) are
+optional; left out, or `null`, they are not sent, and the run's are used. If
+you send them they must equal the run's, or the gate refuses with
+`input_disagrees`.
+
+A refusal from the gate passes its token through as `reason` (for example
+`malformed`, `already_fetched`, `input_disagrees`, or the exchange's own
+refusal token). The SDK's own reasons:
 
 | `reason` | When |
 |---|---|
 | `not_data_fetch` | `AIRLOCK_RUN_MODE` is not `data_fetch`; the gate is not contacted |
 | `no_gate` | `AIRLOCK_GATE_SOCKET` is unset or empty |
-| `malformed` | the request cannot be serialized as JSON, is over 64 KiB, or the range lacks `from` or `to` (the gate is not contacted); also the gate's own token for a request it rejects |
+| `malformed` | the request cannot be serialized as JSON, is over 64 KiB, or a range given lacks `from` or `to` (the gate is not contacted); also the gate's own token for a request it rejects |
 | `unsupported` | the gate does not offer a data fetch (an older orchestrator, or another run mode) |
 | `gate_unreachable` | the request fails to connect, errors, or times out |
 | `gate_error` | an internal gate error, an unexpected status, or a refusal that is not a token |

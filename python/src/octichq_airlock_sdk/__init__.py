@@ -38,7 +38,7 @@ from .content import (
     resolve_policy,
     with_content,
 )
-from .gate import FetchResult, fetch_data, sealed_input
+from .gate import AttestResult, FetchResult, attest_key, fetch_data, sealed_input
 from .identity import Identity, current_identity, with_identity
 from .otlp_json import encode_spans
 from .pipeline import (
@@ -75,6 +75,7 @@ __all__ = [
     "SDK_VERSION",
     "Agent",
     "AnnotationScope",
+    "AttestResult",
     "BatchOptions",
     "ContentCapture",
     "ContentOptions",
@@ -93,6 +94,7 @@ __all__ = [
     "Target",
     "Telemetry",
     "agent_attributes",
+    "attest_key",
     "current_capture",
     "current_identity",
     "current_run_id",
