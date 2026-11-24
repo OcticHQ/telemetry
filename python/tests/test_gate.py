@@ -149,11 +149,10 @@ def sealed_soon() -> bytes | None:
 # -- the sealed input -----------------------------------------------------------
 
 
-@pytest.mark.parametrize("mode", ["data_blind", "data_fetch"])
 def test_sealed_input_reads_the_blob_from_the_gate(
-    server: _Server, monkeypatch: pytest.MonkeyPatch, mode: str
+    server: _Server, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", mode)
+    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
     assert sealed_input() == b"sealed"
 
 
@@ -162,8 +161,9 @@ def test_sealed_input_is_none_outside_those_modes(
 ) -> None:
     monkeypatch.delenv("AIRLOCK_RUN_MODE", raising=False)
     assert sealed_input() is None
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "standard")
-    assert sealed_input() is None
+    for mode in ("standard", "data_fetch"):
+        monkeypatch.setenv("AIRLOCK_RUN_MODE", mode)
+        assert sealed_input() is None
     assert server.requests == []
 
 
@@ -283,7 +283,7 @@ def test_another_os_error_is_fatal_at_first_and_retried_later(
 def test_sealed_input_waits_through_404s_silently(
     server: _Server, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_fetch")
+    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
     server.queued[("GET", "/v0/data/sealed")] = [(404, b"not yet\n")] * 2
     started = time.monotonic()
     with caplog.at_level("WARNING", logger="octichq_airlock_sdk"):
@@ -395,7 +395,7 @@ def test_attest_key_posts_the_exact_body_and_parses_the_answer(
 def test_a_bad_attest_answer_is_read_failed(
     server: _Server, monkeypatch: pytest.MonkeyPatch, answer: bytes
 ) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_fetch")
+    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
     server.routes[("POST", "/v0/attest")] = (200, answer)
     assert attest_key(KEY) == AttestResult(ok=False, reason="read_failed")
 
@@ -425,8 +425,9 @@ def test_attest_key_outside_a_sealed_run_touches_nothing(
 ) -> None:
     monkeypatch.delenv("AIRLOCK_RUN_MODE", raising=False)
     assert attest_key(KEY).reason == "not_sealed_run"
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "standard")
-    assert attest_key(KEY).reason == "not_sealed_run"
+    for mode in ("standard", "data_fetch"):
+        monkeypatch.setenv("AIRLOCK_RUN_MODE", mode)
+        assert attest_key(KEY).reason == "not_sealed_run"
     assert server.requests == []
 
 
@@ -451,7 +452,7 @@ def test_a_short_key_without_a_gate_is_no_gate(monkeypatch: pytest.MonkeyPatch) 
 def test_attest_key_without_a_gate_is_no_gate_and_logs_nothing(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_fetch")
+    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_blind")
     with caplog.at_level("DEBUG", logger="octichq_airlock_sdk"):
         monkeypatch.delenv("AIRLOCK_GATE_SOCKET", raising=False)
         assert attest_key(KEY).reason == "no_gate"
@@ -497,6 +498,22 @@ def test_fetch_data_posts_the_request_then_reads_each_name(
     ]
 
 
+def test_fetch_data_sends_the_credentials_alone_when_the_rest_is_omitted(
+    server: _Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AIRLOCK_RUN_MODE", "data_fetch")
+    server.routes[("POST", "/v0/fetch")] = (200, b'{"names":[]}')
+    assert fetch_data(credentials=CREDENTIALS) == FetchResult(ok=True)
+    assert fetch_data(credentials=CREDENTIALS, consent_id=None, fi_data_range=None).ok
+    assert fetch_data(credentials=CREDENTIALS, consent_id="c").ok
+    alone = {"schema": "airlock.fetch.request.v1", "credentials": CREDENTIALS}
+    assert [json.loads(body) for _, _, _, body in server.requests] == [
+        alone,
+        alone,
+        {**alone, "consent_id": "c"},
+    ]
+
+
 @pytest.mark.parametrize(
     ("status", "body", "reason"),
     [
@@ -505,6 +522,7 @@ def test_fetch_data_posts_the_request_then_reads_each_name(
         (409, b"not_ready\n", "not_ready"),
         (413, b"malformed\n", "malformed"),
         (422, b"consent_expired\n", "consent_expired"),
+        (422, b"input_disagrees\n", "input_disagrees"),
         (422, b"Consent Expired\n", "gate_error"),
         (500, b"fetch failed\n", "gate_error"),
         (502, b"bad_gateway\n", "gate_error"),

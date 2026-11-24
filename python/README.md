@@ -104,10 +104,10 @@ ok = record_receipt("input.read", {"airlock.bytes": 1024})  # False if refused
 `record_receipt` returns `False` for a type or attribute off the vocabulary, a
 missing required attribute, a bad value, an unwritable spool, or a 257th receipt.
 
-### The order (data-blind and data-fetch runs)
+### The order (data-blind runs)
 
 The FIU seals the run's parameters to a key your agent makes at start, so a
-data-blind or data-fetch agent begins the same way:
+data-blind agent begins:
 
 1. Make an X25519 key pair with your own HPKE library; Python's standard
    library has no X25519. The SDK neither makes nor holds the private key.
@@ -139,7 +139,7 @@ token through as `reason`. The reasons:
 
 | `reason` | When |
 |---|---|
-| `not_sealed_run` | `AIRLOCK_RUN_MODE` is neither `data_blind` nor `data_fetch`; the gate is not contacted |
+| `not_sealed_run` | `AIRLOCK_RUN_MODE` is not `data_blind`; the gate is not contacted |
 | `no_gate` | `AIRLOCK_GATE_SOCKET` is unset or empty |
 | `malformed` | the key is not 32 bytes in a byte buffer (`bytes`, `bytearray` or a byte `memoryview`; the gate is not contacted); also the gate's token for a request it rejects, which does not use up the run's attestation |
 | `already_attested` | another key is already attested on this run. Stop |
@@ -149,7 +149,7 @@ token through as `reason`. The reasons:
 | `gate_error` | an internal gate error, an unexpected status, or a refusal that is not a token |
 | `read_failed` | the gate's answer is not a key id, a bundle and an attestation |
 
-### Sealed input (data-blind and data-fetch runs)
+### Sealed input (data-blind runs)
 
 ```python
 from octichq_airlock_sdk import sealed_input
@@ -157,7 +157,7 @@ from octichq_airlock_sdk import sealed_input
 blob = sealed_input()  # bytes, or None; waits for the parameters
 ```
 
-When `AIRLOCK_RUN_MODE` is `data_blind` or `data_fetch`, `sealed_input()` waits
+When `AIRLOCK_RUN_MODE` is `data_blind`, `sealed_input()` waits
 for the run's sealed input: it asks the gate every 2 seconds until the
 parameters arrive, with no limit of its own, since Airlock's deadline stops
 the run. A refused or reset connection, a timeout, or a gate error (5xx) is
@@ -173,20 +173,23 @@ and `attest_key` for up to 60 seconds, so call them with
 
 ### Data fetch (data-fetch runs)
 
-In a data-fetch run the agent opens its sealed parameters, hands the FIU's
-credentials to the gate, and reads back what the gate fetched.
+In a data-fetch run the agent carries the FIU's AA credentials in its own
+image, one set per environment, and picks the set for its run from
+`AIRLOCK_ENVIRONMENT` (`sandbox` or `production`). It hands them to the gate
+and reads back what the gate fetched. Nothing is sealed to the agent, so it
+calls neither `attest_key` nor `sealed_input`.
 
 ```python
-from octichq_airlock_sdk import fetch_data, sealed_input
+import json
+import os
 
-# The sealed input is sealed to your agent's key; opening it is your code.
-# The field names here follow Airlock's test contract. The FIU and your agent
-# agree the real layout.
-params = open_sealed_parameters(sealed_input())
+from octichq_airlock_sdk import fetch_data
+
+# Where the file lives and how it is laid out is your image's choice.
+with open("/etc/agent/credentials.json") as f:
+    sets = json.load(f)
 result = fetch_data(
-    credentials=params["aa_credentials"],  # passed through unchanged
-    consent_id=params["consent_id"],
-    fi_data_range=params["fi_data_range"],  # {"from", "to"}, RFC 3339
+    credentials=sets[os.environ["AIRLOCK_ENVIRONMENT"]],  # airlock.rebit.credentials.v1
 )
 if result.ok:
     for name, data in result.entries.items():  # dict[str, bytes]
@@ -204,19 +207,23 @@ result is the report. `FetchResult` is a frozen dataclass: `ok`, `entries`
 The SDK keeps no copy of the credentials once the request is written. It
 zeroes the bytes it sent, but Python cannot wipe a `str` or `bytes`, so the
 JSON text built along the way stays in memory until it is garbage-collected.
-Your agent still holds its own copy, in the opened parameters: drop it once
-`fetch_data` returns.
+Your agent still holds its own copy: drop it once `fetch_data` returns.
+
+The orchestrator fetches with the consent and range the FIU signed when it
+started the run. `consent_id` and `fi_data_range` (`{"from", "to"}`, RFC 3339)
+are optional; left as `None`, they are not sent, and the run's are used. If you
+send them they must equal the run's, or the gate refuses with
+`input_disagrees`.
 
 A refusal from the gate passes its token through as `reason`: for example
-`malformed`, `already_fetched`, `not_ready` before the sealed parameters have
-arrived, or the exchange's own refusal token. An agent that waits for
-`sealed_input()` first never sees `not_ready`. The SDK's own reasons:
+`malformed`, `already_fetched`, `input_disagrees`, or the exchange's own
+refusal token. The SDK's own reasons:
 
 | `reason` | When |
 |---|---|
 | `not_data_fetch` | `AIRLOCK_RUN_MODE` is not `data_fetch`; the gate is not contacted |
 | `no_gate` | `AIRLOCK_GATE_SOCKET` is unset or empty |
-| `malformed` | the request cannot be serialized as JSON, is over 64 KiB, or the range lacks `from` or `to` (the gate is not contacted); also the gate's own token for a request it rejects |
+| `malformed` | the request cannot be serialized as JSON, is over 64 KiB, or a range given lacks `from` or `to` (the gate is not contacted); also the gate's own token for a request it rejects |
 | `unsupported` | the gate does not offer the fetch (an orchestrator without data-fetch runs) |
 | `gate_unreachable` | the request fails to connect, errors, or times out |
 | `gate_error` | an internal gate error, any other status, or a refusal that is not a token |
