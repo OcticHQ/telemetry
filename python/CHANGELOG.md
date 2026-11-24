@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/OcticHQ/telemetry/compare/python-v0.3.0...python-v0.4.0) (2026-11-24)
+
+
+### Features
+
+* **python:** add attest_key, and make sealed_input wait for the parameters ([b49aa75](https://github.com/OcticHQ/telemetry/commit/b49aa75b764c3a554f8de2bb725a5d0a430fc0cf))
+* **python:** add fetch_data for Airlock's data-fetch runs ([97db8e8](https://github.com/OcticHQ/telemetry/commit/97db8e85a258e4e01dbeaf5feb71af695d7f582e))
+
+
+### Documentation
+
+* **python:** say what fetch_data does and does not wipe ([59a5e7c](https://github.com/OcticHQ/telemetry/commit/59a5e7ce65b2f92456bca93af5e3b1cc8a0ca5a2))
+
 ## [0.3.0](https://github.com/OcticHQ/telemetry/compare/python-v0.2.0...python-v0.3.0) (2026-11-12)
 
 
