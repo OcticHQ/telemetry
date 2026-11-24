@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/OcticHQ/telemetry/compare/node-v0.4.0...node-v0.5.0) (2026-11-24)
+
+
+### Features
+
+* **node:** add attestKey, and make sealedInput wait for the parameters ([d74ed0e](https://github.com/OcticHQ/telemetry/commit/d74ed0ec57ff8ba92fa0ef1d5a94d754195fc022))
+* **node:** add fetchData for Airlock's data-fetch runs ([30b0731](https://github.com/OcticHQ/telemetry/commit/30b073132776fbaae72b486cdb849173df1ae08a))
+* **python:** add attest_key, and make sealed_input wait for the parameters ([b49aa75](https://github.com/OcticHQ/telemetry/commit/b49aa75b764c3a554f8de2bb725a5d0a430fc0cf))
+
 ## [0.4.0](https://github.com/OcticHQ/telemetry/compare/node-v0.3.1...node-v0.4.0) (2026-11-12)
 
 
